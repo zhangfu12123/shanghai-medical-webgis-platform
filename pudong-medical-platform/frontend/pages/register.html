@@ -1,17 +1,16 @@
-html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>注册 - 上海市交通监测平台</title>
+  <title>注册 - 上海市公共医疗资源服务平台</title>
   <link rel="stylesheet" href="../css/main.css" />
-  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
 </head>
 <body>
 <div id="app" class="page-wrap" v-cloak>
   <div class="auth-card">
-    <h2>🚦 用户注册</h2>
+    <h2>🏥 用户注册</h2>
     <form @submit.prevent="doRegister">
       <div class="form-item">
         <label>用户名</label>
@@ -33,61 +32,56 @@ html
   </div>
 </div>
 <script>
-const { createApp, ref } = Vue;
-createApp({
-  setup() {
-    const username = ref('');
-    const password = ref('');
-    const confirmPwd = ref('');
-    const error = ref('');
-
-    function doRegister() {
-      error.value = '';
-      if (!username.value || !password.value || !confirmPwd.value) {
-        error.value = '请填写完整信息';
-        return;
+new Vue({
+  el: '#app',
+  data: {
+    username: '',
+    password: '',
+    confirmPwd: '',
+    error: ''
+  },
+  methods: {
+    doRegister: function () {
+      this.error = '';
+      if (!this.username || !this.password || !this.confirmPwd) {
+        this.error = '请填写完整信息'; return;
       }
-      if (username.value.length < 3) {
-        error.value = '用户名至少3个字符';
-        return;
+      if (this.username.length < 3) {
+        this.error = '用户名至少3个字符'; return;
       }
-      if (password.value.length < 6) {
-        error.value = '密码至少6位';
-        return;
+      if (this.password.length < 6) {
+        this.error = '密码至少6位'; return;
       }
-      if (password.value !== confirmPwd.value) {
-        error.value = '两次输入的密码不一致';
-        return;
+      if (this.password !== this.confirmPwd) {
+        this.error = '两次输入的密码不一致'; return;
       }
-      // 存到本地用户表（演示用）
-      const users = JSON.parse(localStorage.getItem('tj_users') || '[]');
-      if (users.some(u => u.username === username.value)) {
-        error.value = '用户名已存在，请换一个';
-        return;
+      /* 演示：存入本地用户表 */
+      var users = JSON.parse(localStorage.getItem('tj_users') || '[]');
+      if (users.some(function (u) { return u.username === this.username; }.bind(this))) {
+        this.error = '用户名已存在，请换一个'; return;
       }
       users.push({
-        username: username.value,
-        password: password.value,
+        username: this.username,
+        password: this.password,
         createTime: new Date().toLocaleString()
       });
       localStorage.setItem('tj_users', JSON.stringify(users));
       alert('注册成功，请登录');
       location.href = 'login.html';
 
-      /* ---- 后端联调时（B 同学的 /api/user/register 做好后）改用这段： ----
+      /* ---- 后端联调：B 同学的 /api/user/register 做好后改用 ----
       fetch('http://localhost:3000/api/user/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.value, password: password.value })
-      }).then(r => r.json()).then(res => {
+        body: JSON.stringify({ username: this.username, password: this.password })
+      }).then(function (r) { return r.json(); }).then(function (res) {
         if (res.code === 0) { alert('注册成功'); location.href = 'login.html'; }
-        else error.value = res.msg || '注册失败';
-      }).catch(() => { error.value = '后端服务未启动'; });
-      --------------------------------------------------------------- */
+        else { this.error = res.msg || '注册失败'; }
+      }.bind(this)).catch(function () { this.error = '后端服务未启动'; }.bind(this));
+      ------------------------------------------------------------ */
     }
-    return { username, password, confirmPwd, error, doRegister };
   }
-}).mount('#app');
+});
 </script>
 </body>
 </html>

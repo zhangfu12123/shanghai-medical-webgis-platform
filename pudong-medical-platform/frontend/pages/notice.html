@@ -4,14 +4,14 @@ html
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>公告 - 上海市交通监测平台</title>
+  <title>公告 - 上海市公共医疗资源服务平台</title>
   <link rel="stylesheet" href="../css/main.css" />
-  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
 </head>
 <body>
 <div id="app" class="notice-page" v-cloak>
   <header class="top-header">
-    <div class="logo">🚦 上海市交通监测平台</div>
+    <div class="logo">🏥 上海市公共医疗资源服务平台</div>
     <div class="header-right"><a href="../index.html">← 返回主页</a></div>
   </header>
 
@@ -27,31 +27,32 @@ html
   </div>
 </div>
 <script>
-const { createApp, ref } = Vue;
-createApp({
-  setup() {
-    const openId = ref(0);
-    function toggle(id) {
-      openId.value = openId.value === id ? 0 : id;
-    }
-    // 演示数据：正式联调时改为请求 A 同学的后端接口 /api/notice/list
-    const notices = ref([
+new Vue({
+  el: '#app',
+  data: {
+    openId: 0,
+    /* 演示数据：正式联调改为请求 A 同学（尚泽桐）noticeApi.js 的 /api/notice/list */
+    notices: [
       {
-        id: 1, title: '平台试运行通知', date: '2025-05-06',
-        content: '上海市交通监测平台开始试运行。请各位同学务必在自己名下的分支（git checkout 分支名）上开发，不要直接在 main 分支写代码。'
+        id: 1, title: '平台试运行通知', date: '2026-05-06',
+        content: '上海市公共医疗资源服务平台开始试运行。请各位同学务必在自己名下的分支（git checkout 分支名）上开发，不要直接在 main 分支写代码。'
       },
       {
-        id: 2, title: '关于高德地图 Key 的申请说明', date: '2025-05-06',
-        content: '前端地图使用高德 JS API 2.0。每位前端同学可到 lbs.amap.com 申请自己的 Key（服务平台选 Web端(JS API)），域名白名单填 localhost 即可。'
+        id: 2, title: '关于前端技术栈的说明', date: '2026-05-06',
+        content: '前端地图引擎为 OpenLayers（底图使用高德公开瓦片，无需申请 Key），空间计算使用 Turf.js，图表使用 ECharts，框架使用 Vue 2。'
       },
       {
-        id: 3, title: '任务分工表', date: '2025-05-05',
-        content: '后端：A（主服务/行政区/路网/公告）、B（点位/用户/留言）、C（统计/选址/收藏）。前端：D（底座/图层/页面框架）、E（点位/路径）、F（空间分析/热力）、G（看板/选址交互）。'
+        id: 3, title: '任务分工表', date: '2026-05-05',
+        content: '后端：尚泽桐（主框架/边界路网/公告）、邹孟华（点位数据/用户/留言）、张星富（统计/选址/收藏历史）。前端：何飞（GIS底座与UI）、郝远里（点位/路径）、马添祺（空间分析/热力图）、覃江华（看板/选址前端）。'
       }
-    ]);
-    return { notices, openId, toggle };
+    ]
+  },
+  methods: {
+    toggle: function (id) {
+      this.openId = (this.openId === id) ? 0 : id;
+    }
   }
-}).mount('#app');
+});
 </script>
 </body>
 </html>

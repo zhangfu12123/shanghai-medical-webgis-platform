@@ -1,3 +1,4 @@
+css
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
 body {
@@ -8,6 +9,7 @@ body {
 a { color: #1677ff; text-decoration: none; }
 a:hover { opacity: 0.85; }
 button { font-family: inherit; }
+
 /* ---------- 顶部栏 ---------- */
 .top-header {
   height: 56px;
@@ -22,8 +24,10 @@ button { font-family: inherit; }
 .header-right { display: flex; align-items: center; gap: 16px; font-size: 14px; }
 .header-right a { color: #fff; }
 .user-name { opacity: 0.9; }
-/* ---------- 主体三栏布局：左导航 + 中地图 + 右看板 ---------- */
+
+/* ---------- 主体三栏布局 ---------- */
 .main-body { display: flex; height: calc(100vh - 56px); min-height: 0; }
+
 /* 左侧导航 */
 .left-side {
   width: 220px; background: #fff;
@@ -45,10 +49,12 @@ button { font-family: inherit; }
 .layer-item:hover { background: #f5f7fa; }
 .legend { display: flex; flex-direction: column; gap: 6px; padding: 4px 16px; font-size: 12px; color: #666; }
 .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
-.dot.green  { background: #52c41a; }
-.dot.yellow { background: #faad14; }
 .dot.red    { background: #f5222d; }
+.dot.blue   { background: #1677ff; }
+.dot.orange { background: #fa8c16; }
+.dot.green  { background: #52c41a; }
 .side-note { padding: 12px 16px; font-size: 12px; color: #aaa; line-height: 1.6; }
+
 /* 中央地图 */
 .map-wrap { flex: 1; position: relative; min-width: 0; }
 #map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; background: #e6e8eb; }
@@ -63,6 +69,19 @@ button { font-family: inherit; }
   border-radius: 16px; font-size: 13px;
 }
 .map-tip.warn { background: rgba(245, 34, 45, 0.9); }
+
+/* OpenLayers 控件微调 */
+.ol-overviewmap { bottom: 3em; right: 0.5em; left: auto; top: auto; }
+
+/* 地图弹窗（供 E 同学渲染点位详情时使用） */
+.ol-popup {
+  position: absolute; background: #fff; border-radius: 8px;
+  padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  min-width: 220px; font-size: 13px;
+}
+.ol-popup h4 { font-size: 14px; margin-bottom: 6px; }
+.ol-popup p { color: #666; line-height: 1.6; }
+
 /* 右侧看板 */
 .right-side {
   width: 320px; background: #fff;
@@ -70,12 +89,13 @@ button { font-family: inherit; }
   overflow-y: auto; padding: 14px; flex-shrink: 0;
 }
 .panel h3 { font-size: 15px; margin: 8px 0 10px; padding-left: 8px; border-left: 4px solid #1677ff; }
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-.stat-item { background: #f7f9fc; border-radius: 8px; padding: 10px 6px; text-align: center; }
-.stat-item .num { font-size: 22px; font-weight: bold; color: #1677ff; }
-.stat-item .label { font-size: 12px; color: #999; margin-top: 4px; }
-.chart { width: 100%; height: 210px; margin-bottom: 8px; }
-.note { font-size: 12px; color: #999; line-height: 1.7; padding: 4px 0; }
+.dashboard-box {
+  background: #f7f9fc; border: 1px dashed #c0c7d1; border-radius: 8px;
+  padding: 16px 12px; font-size: 13px; color: #666; line-height: 1.9;
+}
+.dashboard-box code { background: #eef2f7; padding: 1px 5px; border-radius: 3px; color: #c41d7f; }
+.note { font-size: 12px; color: #999; line-height: 1.7; padding: 8px 0 4px; }
+
 /* ---------- 登录 / 注册页 ---------- */
 .page-wrap {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
@@ -100,6 +120,7 @@ button { font-family: inherit; }
 }
 .btn-primary:hover { background: #0f5fd7; }
 .form-tip { font-size: 13px; text-align: center; margin-top: 14px; color: #666; }
+
 /* ---------- 公告页 / 个人中心 ---------- */
 .notice-page { background: #f0f2f5; min-height: 100vh; }
 .page-container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }

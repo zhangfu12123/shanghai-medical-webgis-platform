@@ -1,67 +1,101 @@
 /* =====================================================================
- * mapInit.js —— 地图初始化（4号/D 负责）
- * 功能：
- *   1. 加载高德地图 JS API 2.0
- *   2. 设置上海可视范围（中心点、默认缩放级别）
- *   3. 添加比例尺、缩放、鹰眼（小地图）、底图切换控件
- *   4. 创建默认图层（实时路况/路网/卫星影像）交给图层管理器
- * 使用方法：页面里调用  window.initTrafficMap('地图容器的id')
+ * mapInit.js —— OpenLayers 地图初始化（4号 何飞 负责）
+ * OpenLayers 版
  * ===================================================================== */
-const AMAP_KEY = '3b74fbb6322cf172e1363efeffac99e5';
-const AMAP_SECURITY_CODE = '81c30d30e6931d377baedc492ffff410';
-const SHANGHAI_CENTER = [121.4737, 31.2304]; // 上海市中心（人民广场附近）
-const DEFAULT_ZOOM = 11;
-async function initTrafficMap(containerId) {
-  if (typeof window.AMapLoader === 'undefined') {
-    throw new Error('高德地图加载器(loader.js)没有加载成功，请检查网络');
-  }
-  // 新版高德要求：初始化前配置安全密钥（不设置会导致地图空白）
-  window._AMapSecurityConfig = { securityJsCode: AMAP_SECURITY_CODE };
-  const AMap = await window.AMapLoader.load({
-    key: AMAP_KEY,
-    version: '2.0',
-    securityJsCode: AMAP_SECURITY_CODE,
-    plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.OverView', 'AMap.MapType', 'AMap.TileLayer', 'AMap.GeoJSON']
+
+var PUDONG_CENTER = [121.5444, 31.2211]; // 浦东新区中心点
+
+/* 边界/路网数据源：先试后端接口，失败再试本地文件。
+   后端没启动时会报红色 CONNECTION 错误，属正常，不影响底图显示 */
+var DATA_SOURCES = {
+  boundary: [
+    'http://localhost:3000/api/map/pudongBoundary',
+    'GeoJSON/pudong_boundary.geojson'
+  ],
+  road: [
+    'http://localhost:3000/api/map/roadNetwork',
+    'GeoJSON/road.geojson'
+  ]
+};
+
+function loadJSON(url) {
+  return fetch(url).then(function (r) {
+    if (!r.ok) { throw new Error('HTTP ' + r.status); }
+    return r.json();
   });
-  // 1. 创建地图
-  const map = new AMap.Map(containerId, {
-    center: SHANGHAI_CENTER,  // 地图中心：上海
-    zoom: DEFAULT_ZOOM,       // 初始缩放级别
-    viewMode: '2D',           // 2D 平面图
-    zoomEnable: true,         // 允许滚轮缩放
-    dragEnable: true          // 允许拖拽
-  });
-  // 2. 添加控件
-  map.addControl(new AMap.Scale());                      // 比例尺（左下角）
-  map.addControl(new AMap.ToolBar({ position: 'RB' }));  // 缩放条 + 方向罗盘（右下角）
-  map.addControl(new AMap.OverView({ isOpen: false }));  // 鹰眼小地图（右下角点开）
-  map.addControl(new AMap.MapType());                    // 标准图 / 卫星图切换（右上角）
-  // 3. 创建图层管理器
-  const layerManager = new LayerManager(map);
-  // 4. 默认图层（左侧面板可勾选开关）
-  layerManager.addLayer(
-    '实时路况',
-    new AMap.TileLayer.Traffic({ autoRefresh: true, interval: 180, zIndex: 10 }),
-    { type: 'tile', visible: true }
-  );
-  layerManager.addLayer(
-    '路网',
-    new AMap.TileLayer.RoadNet({ zIndex: 3 }),
-    { type: 'tile', visible: true }
-  );
-  layerManager.addLayer(
-    '卫星影像',
-    new AMap.TileLayer.Satellite({ zIndex: 1 }),
-    { type: 'tile', visible: false }
-  );
-  // 5. 把地图相关对象挂到全局，E/F/G 同学的文件都能直接使用：
-  //    window.trafficMap.map            地图对象
-  //    window.trafficMap.layerManager   图层管理器
-  //    window.trafficMap.AMap           高德命名空间
-  window.trafficMap = { AMap: AMap, map: map, layerManager: layerManager };
-  map.on('complete', function () {
-    console.log('高德地图加载完成');
-  });
-  return window.trafficMap;
 }
-window.initTrafficMap = initTrafficMap;
+
+function tryLoad(list) {
+  var i = 0;
+  function next() {
+    if (i >= list.length) { return Promise.reject(new Error('所有数据源加载失败')); }
+    return loadJSON(list[i]).catch(function () { i++; return next(); });
+  }
+  return next();
+}
+
+function initMapBase(targetId) {
+  if (typeof ol === 'undefined') {
+    return Promise.reject(new Error('OpenLayers 未加载，请检查 CDN 网络'));
+  }
+
+  /* 1. 创建地图 */
+  var map = new ol.Map({
+    target: targetId,
+    view: new ol.View({
+      center: ol.proj.fromLonLat(PUDONG_CENTER),
+      zoom: 11,
+      minZoom: 8,
+      maxZoom: 19
+    }),
+  });
+
+  map.addControl(new ol.control.ScaleLine({ units: 'metric' }));
+  map.addControl(new ol.control.OverviewMap({ collapsed: true, tipLabel: '鹰眼小地图' }));
+  var layerManager = new LayerManager(map);
+
+  /* 2. 底图：高德标准图（无需 Key，固定子域，避免加载失败） */
+  layerManager.addTileLayer('高德标准图', new ol.layer.Tile({
+    source: new ol.source.XYZ({
+      url: 'https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+      crossOrigin: 'anonymous'
+    }),
+    zIndex: 0
+  }), { type: 'base', visible: true });
+
+  /* 3. 底图：高德卫星图（左侧面板可切换） */
+  layerManager.addTileLayer('高德卫星图', new ol.layer.Tile({
+    source: new ol.source.XYZ({
+      url: 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
+      crossOrigin: 'anonymous'
+    }),
+    zIndex: 0
+  }), { type: 'base', visible: false });
+
+  /* 4. 立刻暴露全局对象，地图马上可用 */
+  window.mapBase = { ol: ol, map: map, layerManager: layerManager, dataSources: DATA_SOURCES };
+
+  /* 5. 边界 / 路网改成后台加载，不阻塞地图显示 */
+  tryLoad(DATA_SOURCES.boundary).then(function (geojson) {
+    var lyr = layerManager.addVectorLayer('浦东边界', geojson, {
+      strokeColor: '#1677ff',
+      fillColor: 'rgba(22,119,255,0.08)'
+    });
+    map.getView().fit(lyr.getSource().getExtent(), { padding: [60, 60, 60, 60], duration: 800 });
+  }).catch(function (e) {
+    console.warn('浦东边界加载失败（不影响底图显示）：', e);
+  });
+
+  tryLoad(DATA_SOURCES.road).then(function (geojson) {
+    layerManager.addVectorLayer('路网', geojson, {
+      strokeColor: '#9aa5b1', strokeWidth: 1, strokeOpacity: 0.8
+    });
+  }).catch(function (e) {
+    console.warn('路网加载失败（不影响底图显示）：', e);
+  });
+
+  /* 6. 立即完成初始化（和旧版最大的区别在这里） */
+  return Promise.resolve(window.mapBase);
+}
+
+window.initMapBase = initMapBase;
