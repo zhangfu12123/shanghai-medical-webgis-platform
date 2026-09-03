@@ -3,7 +3,6 @@ const express = require('express')
 const router = express.Router()
 const { pool } = require('../db/db.js')
 
-// ========== 收藏模块 user_collect表 ==========
 /**
  * @api POST /api/collect/add
  * @desc 添加点位收藏
@@ -74,7 +73,6 @@ router.get('/myList',async (req,res)=>{
   }
 })
 
-// ========== 选址评估历史 site_evaluation ==========
 /**
  * @api POST /api/collect/saveSiteEval
  * @desc 保存选址评估结果
@@ -118,7 +116,6 @@ router.get('/siteEvalList',async (req,res)=>{
   }
 })
 
-// ========== 用户查询历史 search_record ==========
 /**
  * @api POST /api/collect/saveSearchRecord
  * @desc 保存用户查询历史

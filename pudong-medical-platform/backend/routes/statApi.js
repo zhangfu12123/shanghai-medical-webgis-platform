@@ -91,7 +91,7 @@ router.post('/reachIndex', async (req, res) => {
     const dbReq = pool.request()
     dbReq.input('lng', parseFloat(pointLng))
     dbReq.input('lat', parseFloat(pointLat))
-    // 统计5km、10km范围内医疗点数量，作为可达性原始指标
+    
     const sqlText = `
       SELECT 
         (SELECT COUNT(*) FROM medical_point WHERE SQRT( POWER((lng-@lng)*111000,2)+POWER((lat-@lat)*111000,2)) <=5000 ) as fiveKmCnt,
