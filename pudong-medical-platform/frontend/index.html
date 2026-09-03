@@ -1,0 +1,214 @@
+html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>上海市交通监测平台</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <!-- Vue 3（CDN 方式引入，不需要安装） -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+  <!-- ECharts 图表 -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <!-- 高德地图加载器 -->
+  <script src="https://webapi.amap.com/loader.js"></script>
+</head>
+<body>
+<div id="app" v-cloak>
+  <!-- ================= 顶部栏 ================= -->
+  <header class="top-header">
+    <div class="logo">🚦 上海市交通监测平台</div>
+    <div class="header-right">
+      <a href="pages/notice.html">📢 公告</a>
+      <template v-if="userName">
+        <a href="pages/personal.html">👤 个人中心</a>
+        <span class="user-name">你好，{{ userName }}</span>
+        <a href="javascript:;" @click="logout">退出</a>
+      </template>
+      <template v-else>
+        <a href="pages/login.html">登录</a>
+        <a href="pages/register.html">注册</a>
+      </template>
+    </div>
+  </header>
+
+  <!-- ================= 主体：左导航 + 中地图 + 右看板 ================= -->
+  <div class="main-body">
+    <!-- 左侧：功能菜单 + 图层开关 -->
+    <aside class="left-side">
+      <div class="side-title">功能菜单</div>
+      <ul class="side-menu">
+        <li v-for="m in menus" :key="m.id"
+            :class="{ active: activeMenu === m.id }"
+            @click="switchMenu(m)">{{ m.name }}</li>
+      </ul>
+
+      <div class="side-title">地图图层</div>
+      <div class="layer-item" v-for="l in layerList" :key="l.name">
+        <input type="checkbox" :checked="l.visible" @change="toggleLayer(l)" />
+        <span>{{ l.name }}</span>
+      </div>
+
+      <div class="side-title">路况图例</div>
+      <div class="legend">
+        <span><i class="dot green"></i>畅通</span>
+        <span><i class="dot yellow"></i>缓行</span>
+        <span><i class="dot red"></i>拥堵</span>
+      </div>
+      <p class="side-note">提示：右下角小按钮可展开鹰眼小地图。</p>
+    </aside>
+
+    <!-- 中央：地图 -->
+    <main class="map-wrap">
+      <div id="map"></div>
+      <div class="map-badge">当前功能：{{ activeMenuName }}</div>
+      <div class="map-tip warn" v-if="mapError">{{ mapError }}</div>
+      <div class="map-tip" v-else-if="!mapReady">⏳ 地图加载中…</div>
+    </main>
+
+    <!-- 右侧：统计看板（示例数据，G 后续接真实数据） -->
+    <aside class="right-side">
+      <div class="panel">
+        <h3>今日路况概览</h3>
+        <div class="stat-grid">
+          <div class="stat-item"><div class="num">1.68</div><div class="label">拥堵指数</div></div>
+          <div class="stat-item"><div class="num">32</div><div class="label">平均车速(km/h)</div></div>
+          <div class="stat-item"><div class="num">46.8万</div><div class="label">在网车辆</div></div>
+          <div class="stat-item"><div class="num">12</div><div class="label">今日事件(起)</div></div>
+        </div>
+        <div id="chartTrend" class="chart"></div>
+        <h3>各区拥堵指数 TOP5</h3>
+        <div id="chartRank" class="chart"></div>
+        <p class="note">注：以上图表为演示用的示例数据，正式统计由 G 同学（统计看板）接入后端 /api/stat 接口后替换。</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="js/layerManager.js"></script>
+<script src="js/mapInit.js"></script>
+
+<!-- E/F/G 同学的文件接入时，在这里追加 script 标签，例如：
+<script src="js/trafficPoint.js"></script>
+<script src="js/route.js"></script>
+<script src="js/spatialAnalysis.js"></script>
+<script src="js/heatMap.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/siteSelectFront.js"></script>
+-->
+
+<script>
+const { createApp, ref, computed, onMounted } = Vue;
+
+const app = createApp({
+  setup() {
+    /* ---------- 登录状态 ---------- */
+    const userName = ref(localStorage.getItem('tj_username') || '');
+    function logout() {
+      localStorage.removeItem('tj_username');
+      userName.value = '';
+      alert('已退出登录');
+    }
+
+    /* ---------- 左侧功能菜单 ---------- */
+    const menus = ref([
+      { id: 'traffic',  name: '🚗 实时路况', owner: '4号(D) 已就绪' },
+      { id: 'camera',   name: '📷 监控点位', owner: 'E 同学' },
+      { id: 'event',    name: '⚠️ 交通事件', owner: 'E 同学' },
+      { id: 'route',    name: '🛣️ 路径规划', owner: 'E 同学' },
+      { id: 'analysis', name: '📐 空间分析', owner: 'F 同学' },
+      { id: 'heatmap',  name: '🔥 热力分析', owner: 'F 同学' },
+      { id: 'dashboard',name: '📊 统计看板', owner: 'G 同学' },
+      { id: 'site',     name: '📍 选址分析', owner: 'G 同学' }
+    ]);
+    const activeMenu = ref('traffic');
+    const activeMenuName = computed(() =>
+      menus.value.find(m => m.id === activeMenu.value).name
+    );
+    function switchMenu(m) {
+      activeMenu.value = m.id;
+      if (m.id === 'traffic') {
+        alert('实时路况图层已显示在地图上，可用左侧"地图图层"开关控制。');
+      } else {
+        alert('" ' + m.name + ' " 模块由 ' + m.owner + ' 负责开发，接入后即可使用。');
+      }
+    }
+
+    /* ---------- 地图 ---------- */
+    const mapReady = ref(false);
+    const mapError = ref('');
+    const layerList = ref([]);
+    let trafficMap = null;
+
+    function toggleLayer(l) {
+      trafficMap.layerManager.toggle(l.name);      // 图层显示/隐藏切换
+      layerList.value = trafficMap.layerManager.getStatus(); // 刷新勾选状态
+    }
+
+    async function initMap() {
+      try {
+        trafficMap = await window.initTrafficMap('map');
+        mapReady.value = true;
+        layerList.value = trafficMap.layerManager.getStatus();
+      } catch (e) {
+        console.error(e);
+        mapError.value = '地图加载失败：' + e.message;
+      }
+    }
+
+    /* ---------- 右侧 ECharts 看板 ---------- */
+    let chartTrend = null, chartRank = null;
+    function renderCharts() {
+      chartTrend = echarts.init(document.getElementById('chartTrend'));
+      chartTrend.setOption({
+        title: { text: '24小时车流量趋势', left: 'center', textStyle: { fontSize: 13 } },
+        tooltip: { trigger: 'axis' },
+        grid: { left: 40, right: 10, top: 35, bottom: 25 },
+        xAxis: { type: 'category',
+          data: ['0时','2时','4时','6时','8时','10时','12时','14时','16时','18时','20时','22时'],
+          axisLabel: { fontSize: 10 } },
+        yAxis: { type: 'value', axisLabel: { fontSize: 10 } },
+        series: [{
+          name: '车流量(万辆)', type: 'line', smooth: true,
+          data: [45, 22, 12, 30, 95, 140, 150, 148, 160, 195, 175, 110],
+          areaStyle: { opacity: 0.15 }, itemStyle: { color: '#1677ff' }
+        }]
+      });
+
+      chartRank = echarts.init(document.getElementById('chartRank'));
+      chartRank.setOption({
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { left: 55, right: 10, top: 10, bottom: 25 },
+        xAxis: { type: 'value', axisLabel: { fontSize: 10 } },
+        yAxis: { type: 'category',
+          data: ['浦东新区','闵行区','徐汇区','杨浦区','长宁区'],
+          axisLabel: { fontSize: 11 } },
+        series: [{
+          name: '拥堵指数', type: 'bar',
+          data: [2.31, 2.02, 1.92, 1.81, 1.72],
+          itemStyle: { color: '#ff7a45' },
+          label: { show: true, position: 'right', fontSize: 10 }
+        }]
+      });
+
+      window.addEventListener('resize', () => { chartTrend.resize(); chartRank.resize(); });
+    }
+
+    onMounted(() => {
+      initMap();
+      renderCharts();
+    });
+
+    return {
+      userName, logout,
+      menus, activeMenu, activeMenuName, switchMenu,
+      mapReady, mapError, layerList, toggleLayer
+    };
+  }
+});
+
+app.mount('#app');
+window.trafficApp = app; // 挂到全局，方便 E/F/G 同学在外部 js 里调用界面
+</script>
+</body>
+</html>

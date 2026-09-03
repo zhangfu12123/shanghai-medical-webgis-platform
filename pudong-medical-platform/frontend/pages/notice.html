@@ -1,0 +1,57 @@
+html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>公告 - 上海市交通监测平台</title>
+  <link rel="stylesheet" href="../css/main.css" />
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+</head>
+<body>
+<div id="app" class="notice-page" v-cloak>
+  <header class="top-header">
+    <div class="logo">🚦 上海市交通监测平台</div>
+    <div class="header-right"><a href="../index.html">← 返回主页</a></div>
+  </header>
+
+  <div class="page-container">
+    <h2 class="page-title">📢 平台公告</h2>
+    <div class="card notice-item" v-for="n in notices" :key="n.id">
+      <div class="notice-head" @click="toggle(n.id)">
+        <span class="notice-title">{{ n.title }}</span>
+        <span class="notice-date">{{ n.date }}</span>
+      </div>
+      <div class="notice-content" v-show="openId === n.id">{{ n.content }}</div>
+    </div>
+  </div>
+</div>
+<script>
+const { createApp, ref } = Vue;
+createApp({
+  setup() {
+    const openId = ref(0);
+    function toggle(id) {
+      openId.value = openId.value === id ? 0 : id;
+    }
+    // 演示数据：正式联调时改为请求 A 同学的后端接口 /api/notice/list
+    const notices = ref([
+      {
+        id: 1, title: '平台试运行通知', date: '2025-05-06',
+        content: '上海市交通监测平台开始试运行。请各位同学务必在自己名下的分支（git checkout 分支名）上开发，不要直接在 main 分支写代码。'
+      },
+      {
+        id: 2, title: '关于高德地图 Key 的申请说明', date: '2025-05-06',
+        content: '前端地图使用高德 JS API 2.0。每位前端同学可到 lbs.amap.com 申请自己的 Key（服务平台选 Web端(JS API)），域名白名单填 localhost 即可。'
+      },
+      {
+        id: 3, title: '任务分工表', date: '2025-05-05',
+        content: '后端：A（主服务/行政区/路网/公告）、B（点位/用户/留言）、C（统计/选址/收藏）。前端：D（底座/图层/页面框架）、E（点位/路径）、F（空间分析/热力）、G（看板/选址交互）。'
+      }
+    ]);
+    return { notices, openId, toggle };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

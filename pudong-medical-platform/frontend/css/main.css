@@ -1,0 +1,121 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  background: #f0f2f5; color: #333; font-size: 14px;
+}
+[v-cloak] { display: none; }
+a { color: #1677ff; text-decoration: none; }
+a:hover { opacity: 0.85; }
+button { font-family: inherit; }
+/* ---------- 顶部栏 ---------- */
+.top-header {
+  height: 56px;
+  background: linear-gradient(90deg, #0a3d8f, #1677ff);
+  color: #fff;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  position: relative; z-index: 30;
+}
+.top-header .logo { font-size: 18px; font-weight: bold; letter-spacing: 1px; }
+.header-right { display: flex; align-items: center; gap: 16px; font-size: 14px; }
+.header-right a { color: #fff; }
+.user-name { opacity: 0.9; }
+/* ---------- 主体三栏布局：左导航 + 中地图 + 右看板 ---------- */
+.main-body { display: flex; height: calc(100vh - 56px); min-height: 0; }
+/* 左侧导航 */
+.left-side {
+  width: 220px; background: #fff;
+  border-right: 1px solid #e5e6eb;
+  overflow-y: auto; padding-bottom: 16px; flex-shrink: 0;
+}
+.side-title { font-size: 12px; color: #999; padding: 14px 16px 6px; }
+.side-menu { list-style: none; }
+.side-menu li {
+  padding: 10px 16px; cursor: pointer;
+  border-left: 3px solid transparent; transition: all 0.15s;
+}
+.side-menu li:hover { background: #f5f7fa; }
+.side-menu li.active {
+  background: #e8f3ff; border-left-color: #1677ff;
+  color: #1677ff; font-weight: bold;
+}
+.layer-item { display: flex; align-items: center; gap: 8px; padding: 7px 16px; cursor: pointer; font-size: 13px; }
+.layer-item:hover { background: #f5f7fa; }
+.legend { display: flex; flex-direction: column; gap: 6px; padding: 4px 16px; font-size: 12px; color: #666; }
+.legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.dot.green  { background: #52c41a; }
+.dot.yellow { background: #faad14; }
+.dot.red    { background: #f5222d; }
+.side-note { padding: 12px 16px; font-size: 12px; color: #aaa; line-height: 1.6; }
+/* 中央地图 */
+.map-wrap { flex: 1; position: relative; min-width: 0; }
+#map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; background: #e6e8eb; }
+.map-badge {
+  position: absolute; left: 12px; top: 12px; z-index: 10;
+  background: rgba(255,255,255,0.94); border-radius: 6px; padding: 8px 12px;
+  font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.map-tip {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 10;
+  background: rgba(0,0,0,0.65); color: #fff; padding: 6px 16px;
+  border-radius: 16px; font-size: 13px;
+}
+.map-tip.warn { background: rgba(245, 34, 45, 0.9); }
+/* 右侧看板 */
+.right-side {
+  width: 320px; background: #fff;
+  border-left: 1px solid #e5e6eb;
+  overflow-y: auto; padding: 14px; flex-shrink: 0;
+}
+.panel h3 { font-size: 15px; margin: 8px 0 10px; padding-left: 8px; border-left: 4px solid #1677ff; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.stat-item { background: #f7f9fc; border-radius: 8px; padding: 10px 6px; text-align: center; }
+.stat-item .num { font-size: 22px; font-weight: bold; color: #1677ff; }
+.stat-item .label { font-size: 12px; color: #999; margin-top: 4px; }
+.chart { width: 100%; height: 210px; margin-bottom: 8px; }
+.note { font-size: 12px; color: #999; line-height: 1.7; padding: 4px 0; }
+/* ---------- 登录 / 注册页 ---------- */
+.page-wrap {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #0a3d8f, #1677ff);
+}
+.auth-card {
+  width: 380px; background: #fff; border-radius: 12px; padding: 32px 34px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.auth-card h2 { text-align: center; margin-bottom: 22px; font-size: 20px; }
+.form-item { margin-bottom: 14px; }
+.form-item label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
+.form-item input {
+  width: 100%; height: 38px; border: 1px solid #d9d9d9; border-radius: 6px;
+  padding: 0 10px; font-size: 14px; outline: none;
+}
+.form-item input:focus { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22,119,255,0.15); }
+.form-error { color: #f5222d; font-size: 13px; margin-bottom: 10px; }
+.btn-primary {
+  width: 100%; height: 40px; border: none; border-radius: 6px;
+  background: #1677ff; color: #fff; font-size: 15px; cursor: pointer; letter-spacing: 4px;
+}
+.btn-primary:hover { background: #0f5fd7; }
+.form-tip { font-size: 13px; text-align: center; margin-top: 14px; color: #666; }
+/* ---------- 公告页 / 个人中心 ---------- */
+.notice-page { background: #f0f2f5; min-height: 100vh; }
+.page-container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+.page-title { font-size: 20px; margin-bottom: 16px; }
+.card {
+  background: #fff; border-radius: 10px; padding: 18px 20px; margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.card h3 { font-size: 15px; margin-bottom: 12px; padding-left: 8px; border-left: 4px solid #1677ff; }
+.notice-head { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 6px 0; }
+.notice-title { font-size: 15px; font-weight: bold; }
+.notice-date { font-size: 12px; color: #999; }
+.notice-content {
+  margin-top: 10px; padding: 10px; background: #f7f9fc; border-radius: 6px;
+  font-size: 13px; line-height: 1.8; color: #555;
+}
+.info-row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px dashed #eee; font-size: 14px; }
+.info-row:last-child { border-bottom: none; }
+.empty-tip { color: #999; font-size: 13px; padding: 8px 0; }

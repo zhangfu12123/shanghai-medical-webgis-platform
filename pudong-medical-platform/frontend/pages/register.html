@@ -1,0 +1,93 @@
+html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>注册 - 上海市交通监测平台</title>
+  <link rel="stylesheet" href="../css/main.css" />
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+</head>
+<body>
+<div id="app" class="page-wrap" v-cloak>
+  <div class="auth-card">
+    <h2>🚦 用户注册</h2>
+    <form @submit.prevent="doRegister">
+      <div class="form-item">
+        <label>用户名</label>
+        <input v-model.trim="username" placeholder="至少3个字符" />
+      </div>
+      <div class="form-item">
+        <label>密码</label>
+        <input type="password" v-model.trim="password" placeholder="至少6位" />
+      </div>
+      <div class="form-item">
+        <label>确认密码</label>
+        <input type="password" v-model.trim="confirmPwd" placeholder="再输入一次密码" />
+      </div>
+      <p class="form-error" v-if="error">{{ error }}</p>
+      <button class="btn-primary" type="submit">注 册</button>
+      <p class="form-tip">已有账号？<a href="login.html">直接登录</a></p>
+      <p class="form-tip"><a href="../index.html">← 返回平台主页</a></p>
+    </form>
+  </div>
+</div>
+<script>
+const { createApp, ref } = Vue;
+createApp({
+  setup() {
+    const username = ref('');
+    const password = ref('');
+    const confirmPwd = ref('');
+    const error = ref('');
+
+    function doRegister() {
+      error.value = '';
+      if (!username.value || !password.value || !confirmPwd.value) {
+        error.value = '请填写完整信息';
+        return;
+      }
+      if (username.value.length < 3) {
+        error.value = '用户名至少3个字符';
+        return;
+      }
+      if (password.value.length < 6) {
+        error.value = '密码至少6位';
+        return;
+      }
+      if (password.value !== confirmPwd.value) {
+        error.value = '两次输入的密码不一致';
+        return;
+      }
+      // 存到本地用户表（演示用）
+      const users = JSON.parse(localStorage.getItem('tj_users') || '[]');
+      if (users.some(u => u.username === username.value)) {
+        error.value = '用户名已存在，请换一个';
+        return;
+      }
+      users.push({
+        username: username.value,
+        password: password.value,
+        createTime: new Date().toLocaleString()
+      });
+      localStorage.setItem('tj_users', JSON.stringify(users));
+      alert('注册成功，请登录');
+      location.href = 'login.html';
+
+      /* ---- 后端联调时（B 同学的 /api/user/register 做好后）改用这段： ----
+      fetch('http://localhost:3000/api/user/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.value, password: password.value })
+      }).then(r => r.json()).then(res => {
+        if (res.code === 0) { alert('注册成功'); location.href = 'login.html'; }
+        else error.value = res.msg || '注册失败';
+      }).catch(() => { error.value = '后端服务未启动'; });
+      --------------------------------------------------------------- */
+    }
+    return { username, password, confirmPwd, error, doRegister };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>
