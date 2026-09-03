@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-const sql = require('mssql/msnodesqlv8');
+const sql = require('mssql');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true });
 
@@ -25,25 +25,16 @@ function getConfig() {
     throw new Error(`缺少数据库环境变量：${missingKeys.join(', ')}`);
   }
 
-  const encrypt = toBoolean(process.env.DB_ENCRYPT, false) ? 'yes' : 'no';
-  const trustCertificate = toBoolean(process.env.DB_TRUST_SERVER_CERTIFICATE, true) ? 'yes' : 'no';
-  const odbcDriver = process.env.DB_ODBC_DRIVER || 'ODBC Driver 17 for SQL Server';
-  const connectionString = [
-    `Driver={${odbcDriver}}`,
-    `Server={${process.env.DB_SERVER}}`,
-    `Database={${process.env.DB_DATABASE}}`,
-    `Uid={${process.env.DB_USER}}`,
-    `Pwd={${process.env.DB_PASSWORD}}`,
-    'Trusted_Connection=no',
-    `Encrypt=${encrypt}`,
-    `TrustServerCertificate=${trustCertificate}`
-  ].join(';');
-
   return {
-    connectionString,
+    server: process.env.DB_SERVER,
+    port: toInteger(process.env.DB_PORT, 1433),
+    database: process.env.DB_DATABASE,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
     options: {
-      trustedConnection: false,
-      useUTC: true
+      encrypt: toBoolean(process.env.DB_ENCRYPT, false),
+      trustServerCertificate: toBoolean(process.env.DB_TRUST_SERVER_CERTIFICATE, true),
+      enableArithAbort: true
     },
     pool: {
       max: toInteger(process.env.DB_POOL_MAX, 10),

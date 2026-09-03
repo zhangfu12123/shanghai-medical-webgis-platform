@@ -47,7 +47,7 @@ function errorHandler(error, req, res, next) {
   const message = status >= 500 && isProduction ? '服务器内部错误' : error.message;
   const details = status >= 500 && isProduction ? null : error.details;
 
-  if (status >= 500) {
+  if (status >= 500 && !(error instanceof HttpError)) {
     console.error(`[${new Date().toISOString()}]`, error);
   }
 
