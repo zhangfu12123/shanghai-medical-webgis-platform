@@ -9,6 +9,7 @@ const userRouter = require('./routes/userApi')
 const commentRouter = require('./routes/commentApi')
 const statRouter = require('./routes/statApi')
 const collectRouter = require('./routes/collectApi')
+const gisExtraRouter = require('./routes/gisExtraApi')
 const app = express()
 const PORT = 3000
 app.use(cors())
@@ -30,6 +31,7 @@ app.use('/api/user', userRouter)
 app.use('/api/comment', commentRouter)
 app.use('/api/stat', statRouter)
 app.use('/api/collect', collectRouter)
+app.use('/api/gisExtra', gisExtraRouter)
 //全局错误捕获
 app.use((err, req, res, next) => {
     console.error(err)

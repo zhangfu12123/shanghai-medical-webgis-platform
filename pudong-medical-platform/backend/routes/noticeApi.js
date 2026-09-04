@@ -25,6 +25,9 @@ router.get('/', async (req, res) => {
 router.post('/add', async (req, res) => {
     try {
         const { title, content, publish_user, is_show = 1 } = req.body
+        if(!title || !content || !publish_user){
+            return res.fail('标题、内容、发布人不能为空')
+        }
         const pool = getPool()
         await pool.request()
             .input('title', sql.NVarChar, title)
@@ -44,13 +47,19 @@ router.put('/update/:id', async (req, res) => {
     try {
         const { id } = req.params
         const { title, content, is_show } = req.body
+        if(!title || !content){
+            return res.fail('标题、内容不能为空')
+        }
         const pool = getPool()
-        await pool.request()
+        const result = await pool.request()
             .input('id', sql.Int, id)
             .input('title', sql.NVarChar, title)
             .input('content', sql.NVarChar, content)
             .input('is_show', sql.TinyInt, is_show)
             .query(`update system_notice set title=@title,content=@content,is_show=@is_show where id=@id`)
+        if(result.rowsAffected[0] === 0){
+            return res.fail('该公告不存在',404)
+        }
         return res.success(null, "修改公告成功")
     } catch (e) {
         return res.fail(e.message)
@@ -62,7 +71,12 @@ router.delete('/del/:id', async (req, res) => {
     try {
         const { id } = req.params
         const pool = getPool()
-        await pool.request().input('id', sql.Int, id).query(`delete from system_notice where id=@id`)
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`delete from system_notice where id=@id`)
+        if(result.rowsAffected[0] === 0){
+            return res.fail('该公告不存在',404)
+        }
         return res.success(null, "删除公告成功")
     } catch (e) {
         return res.fail(e.message)
