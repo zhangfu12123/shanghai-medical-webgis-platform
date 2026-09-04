@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 // 1. 读取原始Excel（文件名和你实际的一致）
-const excelPath = path.join(__dirname, './raw/上海市医疗机构与药店名录（单表版）.xlsx');
+const excelPath = path.join(__dirname, './raw/上海市医疗机构与药店名录（单表版·含坐标）.xlsx');
 const workbook = XLSX.readFile(excelPath);
 const sheetName = workbook.SheetNames[0];
 const sheet = workbook.Sheets[sheetName];
