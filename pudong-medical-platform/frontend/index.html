@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>上海市公共医疗资源服务平台</title>
+<link rel="stylesheet" href="css/main.css" />
+<!-- OpenLayers（锁定 v7.5.2，CDN 路径稳定） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.5.2/ol.css" />
+<script src="https://cdn.jsdelivr.net/npm/ol@v7.5.2/dist/ol.js"></script>
+<!-- Turf.js 空间计算库 -->
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+<!-- ECharts 图表 -->
+<script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+<!-- Vue 2（按 README 指定版本） -->
+<script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+</head>
+<body>
+<div id="app" v-cloak>
+  <!-- ========== 顶部栏 ========== -->
+  <header class="top-header">
+    <div class="logo">🏥 上海市公共医疗资源服务平台</div>
+    <div class="header-right">
+      <a href="pages/notice.html">📢 公告</a>
+      <template v-if="userName">
+        <a href="pages/personal.html">👤 个人中心</a>
+        <span class="user-name">你好，{{ userName }}</span>
+        <a href="javascript:;" @click="logout">退出</a>
+      </template>
+      <template v-else>
+        <a href="pages/login.html">登录</a>
+        <a href="pages/register.html">注册</a>
+      </template>
+    </div>
+  </header>
+
+  <!-- ========== 主体三栏：左导航 + 中地图 + 右看板 ========== -->
+  <div class="main-body">
+    <aside class="left-side">
+      <div class="side-title">功能菜单</div>
+      <ul class="side-menu">
+        <li v-for="m in menus" :key="m.id"
+            :class="{active: activeMenu === m.id}"
+            @click="switchMenu(m)">{{ m.name }}</li>
+      </ul>
+
+      <div class="side-title">地图图层</div>
+      <div class="layer-item" v-for="l in layerList" :key="l.name">
+        <input type="checkbox" :checked="l.visible" @change="toggleLayer(l)" />
+        <span>{{ l.name }}</span>
+      </div>
+
+      <div class="side-title">点位图例</div>
+      <div class="legend">
+        <span><i class="dot red"></i>医院</span>
+        <span><i class="dot blue"></i>社区卫生中心</span>
+        <span><i class="dot orange"></i>急救站</span>
+        <span><i class="dot green"></i>药店</span>
+      </div>
+      <p class="side-note">底图：OpenLayers + 高德瓦片（无需 Key）。左下角比例尺，右下角可展开鹰眼小地图。</p>
+    </aside>
+
+    <main class="map-wrap">
+      <div id="map"></div>
+      <div class="map-badge">当前模块：{{ activeMenuName }}</div>
+      <div class="map-tip warn" v-if="mapError">{{ mapError }}</div>
+      <div class="map-tip" v-else-if="!mapReady">⏳ 地图加载中…</div>
+    </main>
+
+    <aside class="right-side">
+      <div class="panel">
+        <h3>📊 统计看板</h3>
+        <div id="dashboardBox" class="dashboard-box">
+          <p>此区域由 <b>G 同学（覃江华）</b> 的 dashboard.js 渲染 ECharts 图表。</p>
+          <p>挂载点：<code>#dashboardBox</code>；地图全局对象：<code>window.mapBase</code>。</p>
+        </div>
+        <p class="note">
+          E/F/G 接入后：医疗点位（medicalPoint.js）、路径规划（route.js）、
+          空间分析（spatialAnalysis.js）、热力图（heatMap.js）、
+          看板（dashboard.js）、选址（siteSelectFront.js）将自动出现在对应模块。
+        </p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="js/layerManager.js"></script>
+<script src="js/mapInit.js"></script>
+<!-- 队友文件接入后，把下面的注释去掉：
+<script src="js/medicalPoint.js"></script>
+<script src="js/route.js"></script>
+<script src="js/spatialAnalysis.js"></script>
+<script src="js/heatMap.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/siteSelectFront.js"></script>
+-->
+
+<script>
+var app = new Vue({
+  el: '#app',
+  data: {
+    userName: localStorage.getItem('tj_username') || '',
+    activeMenu: 'point',
+    mapReady: false,
+    mapError: '',
+    layerList: [],
+    menus: [
+      { id: 'point',     name: '🏥 医疗点位',   owner: 'E 郝远里' },
+      { id: 'route',     name: '🚑 路径规划',   owner: 'E 郝远里' },
+      { id: 'analysis',  name: '📐 空间分析',   owner: 'F 马添祺' },
+      { id: 'heatmap',   name: '🔥 可达性热力', owner: 'F 马添祺' },
+      { id: 'dashboard', name: '📊 统计看板',   owner: 'G 覃江华' },
+      { id: 'site',      name: '📍 选址分析',   owner: 'G 覃江华' }
+    ]
+  },
+  computed: {
+    activeMenuName: function () {
+      var self = this;
+      var cur = this.menus.find(function (m) { return m.id === self.activeMenu; });
+      return cur ? cur.name : '';
+    }
+  },
+  methods: {
+    logout: function () {
+      localStorage.removeItem('tj_username');
+      this.userName = '';
+      alert('已退出登录');
+    },
+    switchMenu: function (m) {
+      this.activeMenu = m.id;
+      if (m.id !== 'point') {
+        alert('“' + m.name + '”模块由 ' + m.owner + ' 开发，接入后即可使用。');
+      }
+    },
+    toggleLayer: function (l) {
+      if (!window.mapBase) return;
+      window.mapBase.layerManager.toggle(l.name);
+      this.layerList = window.mapBase.layerManager.getStatus();
+    },
+    initMap: function () {
+      var self = this;
+      window.initMapBase('map').then(function (mb) {
+        self.mapReady = true;
+        self.layerList = mb.layerManager.getStatus();
+      }).catch(function (e) {
+        console.error(e);
+        self.mapError = '地图加载失败：' + (e && e.message ? e.message : e);
+      });
+    }
+  },
+  mounted: function () { this.initMap(); }
+});
+window.app = app; // 全局暴露，方便队友在外部 js 里调用界面
+</script>
+</body>
+</html>
