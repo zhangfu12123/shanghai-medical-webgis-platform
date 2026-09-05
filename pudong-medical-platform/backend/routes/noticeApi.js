@@ -1,8 +1,9 @@
 const express = require('express')
 const router = express.Router()
 const { getPool, sql } = require('../db/db')
-
-//获取公告列表，可过滤是否显示
+// 导入权限中间件
+const { authCheck, adminCheck } = require('./userApi')
+//获取公告列表，可过滤是否显示 —— 无需权限
 router.get('/', async (req, res) => {
     try {
         const { is_show } = req.query
@@ -20,14 +21,15 @@ router.get('/', async (req, res) => {
         return res.fail(e.message)
     }
 })
-
-//新增公告
-router.post('/add', async (req, res) => {
+//新增公告 管理员才可操作
+router.post('/add', authCheck, adminCheck, async (req, res) => {
     try {
-        const { title, content, publish_user, is_show = 1 } = req.body
-        if(!title || !content || !publish_user){
-            return res.fail('标题、内容、发布人不能为空')
+        const { title, content, is_show = 1 } = req.body
+        if(!title || !content){
+            return res.fail('标题、内容不能为空')
         }
+        //发布人ID自动从登录token获取，前端不用传
+        const publish_user = req.user.userId
         const pool = getPool()
         await pool.request()
             .input('title', sql.NVarChar, title)
@@ -41,9 +43,8 @@ router.post('/add', async (req, res) => {
         return res.fail(e.message)
     }
 })
-
-//修改公告
-router.put('/update/:id', async (req, res) => {
+//修改公告 管理员才可操作
+router.put('/update/:id', authCheck, adminCheck, async (req, res) => {
     try {
         const { id } = req.params
         const { title, content, is_show } = req.body
@@ -65,9 +66,8 @@ router.put('/update/:id', async (req, res) => {
         return res.fail(e.message)
     }
 })
-
-//删除公告
-router.delete('/del/:id', async (req, res) => {
+//删除公告 管理员才可操作
+router.delete('/del/:id', authCheck, adminCheck, async (req, res) => {
     try {
         const { id } = req.params
         const pool = getPool()
@@ -82,5 +82,4 @@ router.delete('/del/:id', async (req, res) => {
         return res.fail(e.message)
     }
 })
-
 module.exports = router
