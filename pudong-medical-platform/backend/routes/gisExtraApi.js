@@ -1,7 +1,6 @@
-// routes/gisExtraApi.js
 const express = require('express')
 const router = express.Router()
-const { pool } = require('../db/db.js')
+const { getPool, sql } = require('../db/db')
 
 /**
  * @api GET /api/gisExtra/communityByRadius
@@ -15,6 +14,8 @@ router.get('/communityByRadius', async (req, res) => {
     if (!lng || !lat) {
       return res.json({ code: 400, msg: '缺少经纬度参数lng,lat' })
     }
+
+    const pool = getPool()
     const reqDb = pool.request()
     reqDb.input('lng', parseFloat(lng))
     reqDb.input('lat', parseFloat(lat))
@@ -25,6 +26,7 @@ router.get('/communityByRadius', async (req, res) => {
       WHERE SQRT( POWER((lng - @lng)*111000,2)+POWER((lat-@lat)*111000,2) ) <= @radius
     `
     const rs = await reqDb.query(sqlText)
+
     res.json({
       code: 200,
       msg: 'success',
