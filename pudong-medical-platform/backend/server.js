@@ -1,109 +1,55 @@
-'use strict';
+const express = require('express')
+const cors = require('cors')
+const path = require('path')
+const session = require('express-session')
+const db = require('./db/db')
+const indexRouter = require('./routes/index')
+const noticeRouter = require('./routes/noticeApi')
+const medicalRouter = require('./routes/medicalApi')
+// 修改这里
+const userModule = require('./routes/userApi')
+const userRouter = userModule.router
 
-const fs = require('fs');
-const path = require('path');
-const express = require('express');
-const cors = require('cors');
-
-require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
-
-const apiRouter = require('./routes');
-const { closeDatabase, connectDatabase } = require('./db/db');
-const { errorHandler, notFoundHandler, sendSuccess } = require('./utils/response');
-
-const app = express();
-const port = Number(process.env.PORT) || 3000;
-const frontendDirectory = path.resolve(__dirname, '..', 'frontend');
-
-function getAllowedOrigins() {
-  return (process.env.CORS_ORIGINS || '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+const commentRouter = require('./routes/commentApi')
+const statRouter = require('./routes/statApi')
+const collectRouter = require('./routes/collectApi')
+const gisExtraRouter = require('./routes/gisExtraApi')
+const app = express()
+const PORT = 3000
+app.use(cors())
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+// ✅session配置，验证码必须，放在路由挂载前面！
+app.use(session({
+    secret: "medical_secret_2026",
+    resave: false,
+    saveUninitialized: true,
+    cookie:{maxAge: 5*60*1000} //验证码有效期5分钟
+}))
+app.use('/static', express.static(path.join(__dirname, './static')))
+// 统一响应扩展
+app.response.success = function (data, msg = "操作成功") {
+    return this.json({ code: 200, msg, data })
 }
-
-const allowedOrigins = getAllowedOrigins();
-
-app.disable('x-powered-by');
-app.use(cors({
-  credentials: true,
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    const error = new Error(`不允许的跨域来源：${origin}`);
-    error.status = 403;
-    return callback(error);
-  }
-}));
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: false, limit: '2mb' }));
-
-app.use('/static', express.static(path.join(__dirname, 'public')));
-app.use('/api', apiRouter);
-
-app.get('/', (req, res, next) => {
-  const indexFile = path.join(frontendDirectory, 'index.html');
-  try {
-    if (fs.existsSync(indexFile) && fs.statSync(indexFile).size > 0) {
-      return res.sendFile(indexFile);
-    }
-    return sendSuccess(res, {
-      service: '上海市公共医疗资源服务平台后端',
-      apiHealth: '/api/health',
-      note: '前端首页文件尚未完成'
-    });
-  } catch (error) {
-    return next(error);
-  }
-});
-app.use(express.static(frontendDirectory, { index: false }));
-
-app.use(notFoundHandler);
-app.use(errorHandler);
-
-let server = null;
-
-async function startServer() {
-  await connectDatabase();
-  return new Promise((resolve, reject) => {
-    server = app.listen(port, () => {
-      console.log(`后端服务已启动：http://localhost:${port}`);
-      resolve(server);
-    });
-    server.on('error', reject);
-  });
+app.response.fail = function (msg = "操作失败", code = 500) {
+    return this.json({ code, msg, data: null })
 }
-
-async function shutdown(signal) {
-  console.log(`收到${signal}，正在关闭服务...`);
-  if (server) {
-    await new Promise((resolve) => server.close(resolve));
-  }
-  await closeDatabase();
-}
-
-if (require.main === module) {
-  startServer().catch((error) => {
-    console.error('服务启动失败：', error);
-    process.exitCode = 1;
-  });
-
-  for (const signal of ['SIGINT', 'SIGTERM']) {
-    process.once(signal, async () => {
-      try {
-        await shutdown(signal);
-        process.exit(0);
-      } catch (error) {
-        console.error('服务关闭失败：', error);
-        process.exit(1);
-      }
-    });
-  }
-}
-
-module.exports = {
-  app,
-  shutdown,
-  startServer
-};
+//挂载路由
+app.use('/api', indexRouter)
+app.use('/api/notice', noticeRouter)
+app.use('/api/medical', medicalRouter)
+app.use('/api/user', userRouter)
+app.use('/api/comment', commentRouter)
+app.use('/api/stat', statRouter)
+app.use('/api/collect', collectRouter)
+app.use('/api/gisExtra', gisExtraRouter)
+//全局错误捕获
+app.use((err, req, res, next) => {
+    console.error(err)
+    return res.fail("服务器内部异常")
+})
+app.listen(PORT, async () => {
+    console.log(`服务启动，端口:${PORT}`)
+    console.log(`访问地址：http://localhost:${PORT}`)
+    await db.connect()
+})
