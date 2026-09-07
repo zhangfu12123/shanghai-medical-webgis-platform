@@ -1,0 +1,78 @@
+html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>登录 - 上海市公共医疗资源服务平台</title>
+  <link rel="stylesheet" href="../css/main.css" />
+  <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+</head>
+<body>
+<div id="app" class="page-wrap" v-cloak>
+  <div class="auth-card">
+    <h2>🏥 用户登录</h2>
+    <form @submit.prevent="doLogin">
+      <div class="form-item">
+        <label>用户名</label>
+        <input v-model.trim="username" placeholder="请输入用户名" />
+      </div>
+      <div class="form-item">
+        <label>密码</label>
+        <input type="password" v-model.trim="password" placeholder="请输入密码" />
+      </div>
+      <p class="form-error" v-if="error">{{ error }}</p>
+      <button class="btn-primary" type="submit">登 录</button>
+      <p class="form-tip">还没有账号？<a href="register.html">立即注册</a></p>
+      <p class="form-tip"><a href="../index.html">← 返回平台主页</a></p>
+    </form>
+  </div>
+</div>
+<script>
+new Vue({
+  el: '#app',
+  data: {
+    username: '',
+    password: '',
+    error: ''
+  },
+  methods: {
+    doLogin: function () {
+      this.error = '';
+      if (!this.username || !this.password) {
+        this.error = '用户名和密码不能为空';
+        return;
+      }
+      /* 演示：从注册页存好的本地用户表里查找 */
+      var users = JSON.parse(localStorage.getItem('tj_users') || '[]');
+      var user = users.find(function (u) { return u.username === this.username; }.bind(this));
+      if (user && user.password !== this.password) {
+        this.error = '密码错误，请重新输入';
+        return;
+      }
+      localStorage.setItem('tj_username', this.username);
+      localStorage.setItem('tj_login_time', new Date().toLocaleString());
+      alert('登录成功！');
+      location.href = '../index.html';
+
+      /* ---- 后端联调：B 同学（邹孟华）userApi.js 做好后，把上面演示逻辑删掉，
+             改用下面的真实请求（接口地址以后端为准）----
+      fetch('http://localhost:3000/api/user/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: this.username, password: this.password })
+      }).then(function (r) { return r.json(); }).then(function (res) {
+        if (res.code === 0) {
+          localStorage.setItem('tj_username', res.data.username);
+          location.href = '../index.html';
+        } else {
+          this.error = res.msg || '登录失败';
+        }
+      }.bind(this)).catch(function () { this.error = '后端服务未启动'; }.bind(this));
+      ------------------------------------------------------------ */
+    }
+  }
+});
+</script>
+</body>
+</html>
