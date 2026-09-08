@@ -1,20 +1,28 @@
-const TOKEN_KEY = 'token'
-const USER_KEY = 'userInfo'
+export function getToken(){
+  return localStorage.getItem('token')
+}
 
-export function setToken(val) {
-  localStorage.setItem(TOKEN_KEY, val)
+export function setToken(val){
+  return localStorage.setItem('token',val)
 }
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY) || ''
+
+export function removeToken(){
+  return localStorage.removeItem('token')
 }
-export function setUserInfo(obj) {
-  localStorage.setItem(USER_KEY, JSON.stringify(obj))
-}
+
 export function getUserInfo() {
-  const str = localStorage.getItem(USER_KEY)
-  return str ? JSON.parse(str) : null
+  try {
+    return JSON.parse(localStorage.getItem('userInfo') || 'null')
+  } catch {
+    return null
+  }
 }
+
+export function setUserInfo(val) {
+  localStorage.setItem('userInfo', JSON.stringify(val))
+}
+
 export function clearStorage() {
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(USER_KEY)
+  localStorage.removeItem('token')
+  localStorage.removeItem('userInfo')
 }

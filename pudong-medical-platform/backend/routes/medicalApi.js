@@ -34,4 +34,30 @@ router.get('/point/:id', async (req, res) => {
     }
 })
 
+//【新增】模糊搜索：medical_point + community两张表合并查询
+router.get('/searchLike', async (req, res) => {
+    try {
+        const { keyword } = req.query
+        if (!keyword) return res.success([])
+        const pool = getPool()
+        const rs = await pool.request()
+            .input('kw', sql.NVarChar, `%${keyword}%`)
+            .query(`
+                select id,name,type,address,lng,lat 
+                from medical_point 
+                where name like @kw or address like @kw
+
+                union all
+
+                select id,name,'居民区' as type,'' as address,lng,lat 
+                from community 
+                where name like @kw
+            `)
+        return res.success(rs.recordset)
+    } catch (e) {
+        console.error(e)
+        return res.fail(e.message)
+    }
+})
+
 module.exports = router

@@ -1,19 +1,19 @@
 <template>
-  <div class="page‑admin‑notice">
+  <div class="page-admin-notice">
     <h2>公告管理（管理员）</h2>
     <button @click="$router.push('/home')">返回首页</button>
     <hr />
-    <div class="edit‑form">
+    <div class="edit-form">
       <h3>{{ editForm.id > 0 ? '编辑公告' : '新增公告' }}</h3>
-      <p>标题：<input v‑model="editForm.title" style="width:400px" /></p>
-      <p>内容：<textarea v‑model="editForm.content" style="width:400px;height:120px"></textarea></p>
-      <p>是否显示：<input type="checkbox" v‑model="editForm.is_show" /></p>
+      <p>标题：<input v-model="editForm.title" style="width:400px" /></p>
+      <p>内容：<textarea v-model="editForm.content" style="width:400px;height:120px"></textarea></p>
+      <p>是否显示：<input type="checkbox" v-model="editForm.is_show" /></p>
       <button @click="submitNotice">保存</button>
       <button @click="resetEdit">清空</button>
     </div>
     <hr />
     <h3>公告列表</h3>
-    <div v‑for="n in noticeList" :key="n.id" class="row">
+    <div v-for="n in noticeList" :key="n.id" class="row">
       <h4>{{ n.title }}</h4>
       <p>{{ n.content }}</p>
       <p>显示状态：{{ n.is_show ? '显示' : '隐藏' }}｜{{ n.create_time }}</p>
@@ -26,7 +26,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import request from '../api/request'
-
 const noticeList = ref([])
 const editForm = ref({ id: 0, title: '', content: '', is_show: true })
 
@@ -76,8 +75,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page‑admin‑notice {
-  max‑width: 1000px;
+.page-admin-notice {
+  max-width: 1000px;
   margin: 20px auto;
   padding: 12px;
 }
