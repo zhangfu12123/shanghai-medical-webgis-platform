@@ -40,7 +40,7 @@
         </div>
         <div class="panel-block">
           <div class="block-title">功能分析</div>
-          <div class="menu-item" @click="openRoutePanel">路径规划</div>
+          <div class="menu-item" @click="routePanelShow=true">路径规划</div>
           <div class="menu-item" @click="create15MinBuffer">15分钟服务圈</div>
           <div class="menu-item" @click="toggleStatPanel">系统统计</div>
           <div class="menu-item" @click="aiDialogVisible=true">AI就医咨询</div>
@@ -53,26 +53,7 @@
       <!-- 中间：高德地图区域 -->
       <section class="map-wrap">
         <MapContainer @map-ready="onMapReady" />
-        <!-- 路径规划悬浮面板：输入联想 + 地图点击拾取 -->
-        <div class="route-panel" v-if="routePanelShow">
-          <div class="route-title">
-            步行路径规划
-            <span class="close-btn" @click="closeRoutePanel">×</span>
-          </div>
-          <div class="route-form-item">
-            <label>起点（输入搜索 / 地图点击拾取）</label>
-            <input id="inputStart" v-model="route.startName" class="route-input" placeholder="输入地点，选择联想结果" />
-          </div>
-          <div class="route-form-item">
-            <label>终点（输入搜索 / 地图点击拾取）</label>
-            <input id="inputEnd" v-model="route.endName" class="route-input" placeholder="输入地点，选择联想结果" />
-          </div>
-          <div class="route-tip">{{ routeClickTip }}</div>
-          <div class="route-btn-row">
-            <button class="btn-primary route-btn" @click="doRouteSearch">生成路径</button>
-            <button class="btn-gray route-btn" @click="clearRouteDraw">清除路线</button>
-          </div>
-        </div>
+        <RoutePlanner ref="routePlannerRef" v-model:visible="routePanelShow" :map="routeMap" />
       </section>
       <aside class="aside-right" v-show="statPanelVisible">
         <div class="stat-card">
@@ -104,9 +85,10 @@
 </template>
 
 <script setup>
-import {ref,onUnmounted,nextTick,onMounted} from 'vue'
+import {ref,onUnmounted,onMounted,nextTick} from 'vue'
 import {useRouter} from 'vue-router'
 import MapContainer from '../components/MapContainer.vue'
+import RoutePlanner from '../components/RoutePlanner.vue'
 //引入抽离的AI弹窗组件
 import AiChatDialog from '../components/AiChatDialog.vue'
 import request from '../api/request'
@@ -120,16 +102,9 @@ const aiDialogVisible = ref(false)
 const aiChatRef = ref(null)
 
 let map = null
+const routeMap = ref(null)
 let chartTotal = null
 let chartType = null
-let walking = null
-let autoStart = null
-let autoEnd = null
-let isMapPickBind = false
-// 新增：地理编码 / POI 搜索实例（只初始化一次）
-let geocoder = null
-let placeSearch = null
-let routePluginsReady = false
 const userInfo = ref(getUserInfo())
 const loadPointType = ref('')
 const showSiteModal = ref(false)
@@ -139,15 +114,7 @@ const statPanelVisible = ref(false)
 
 //路径规划
 const routePanelShow = ref(false)
-const routeClickTip = ref("🔵输入地点搜索，或点击地图拾取【起点】")
-const route = ref({
-  startName:'',
-  endName:'',
-  startLngLat:null,
-  endLngLat:null
-})
-//0关闭拾取，1拾取起点，2拾取终点
-const mapClickStatus = ref(0)
+const routePlannerRef = ref(null)
 const medicalTypeList = ref([])
 let tempSiteLng=null
 let tempSiteLat=null
@@ -199,209 +166,8 @@ window.submitComment = async function(pointId){
 //地图初始化
 const onMapReady = (m)=>{
   map = m
+  routeMap.value = m
 }
-/* ============ 路径规划核心工具：插件初始化 / 地名↔坐标 ============ */
-function initRoutePlugins(){
-  if(routePluginsReady) return Promise.resolve()
-  return new Promise((resolve)=>{
-    window.AMap.plugin(['AMap.Geocoder','AMap.PlaceSearch','AMap.Walking'],()=>{
-      geocoder = new window.AMap.Geocoder({
-        city:'上海市',
-        radius:1000
-      })
-      // 注意：不要传 map，否则每次解析都会在地图上撒点
-      placeSearch = new window.AMap.PlaceSearch({
-        city:'上海市',
-        citylimit:false,
-        pageSize:1,
-        extensions:'base'
-      })
-      routePluginsReady = true
-      resolve()
-    })
-  })
-}
-// 坐标 -> 真实地名（逆地理编码）
-function lnglatToName(lnglat){
-  return new Promise((resolve)=>{
-    geocoder.getAddress(lnglat,(status,result)=>{
-      if(status==='complete' && result.regeocode){
-        resolve(result.regeocode.formattedAddress || '')
-      }else{
-        console.warn('逆地理编码失败',status,result)
-        resolve('')
-      }
-    })
-  })
-}
-// 真实地名 -> 坐标（POI 搜索，用于联想结果无坐标 / 纯手输场景）
-function nameToLngLat(name){
-  return new Promise((resolve)=>{
-    placeSearch.search(name,(status,result)=>{
-      const pois = result?.poiList?.pois || []
-      if(status==='complete' && pois.length){
-        resolve({ name:pois[0].name, lnglat:pois[0].location })
-      }else{
-        console.warn('POI搜索无结果',status,result)
-        resolve(null)
-      }
-    })
-  })
-}
-// 统一处理“选中/解析”成功后的状态推进
-function afterPickResolved(which,name,ok){
-  if(which==='start'){
-    if(ok){
-      mapClickStatus.value = 2
-      routeClickTip.value = `✅起点：${name}｜请再选择终点（输入或点地图）`
-    }else{
-      routeClickTip.value = `❌未解析到「${name}」的坐标，请换关键词或点击地图拾取`
-    }
-  }else{
-    if(ok){
-      mapClickStatus.value = 1
-      routeClickTip.value = `✅终点：${name}｜点击「生成路径」，或继续点地图重选起点`
-    }else{
-      routeClickTip.value = `❌未解析到「${name}」的坐标，请换关键词或点击地图拾取`
-    }
-  }
-}
-/* ============ 地图点击拾取：坐标 -> 真实地名回填 ============ */
-async function handleMapPick(e){
-  if(!mapClickStatus.value) return
-  const lnglat = e.lnglat
-  if(!geocoder) await initRoutePlugins()
-  routeClickTip.value = '🔍正在解析该点地址…'
-  const addr = await lnglatToName(lnglat)
-  const label = addr || `${lnglat.getLng().toFixed(6)},${lnglat.getLat().toFixed(6)}`
-  if(mapClickStatus.value === 1){
-    route.value.startLngLat = lnglat
-    route.value.startName = label
-    afterPickResolved('start',label,true)
-  }else if(mapClickStatus.value === 2){
-    route.value.endLngLat = lnglat
-    route.value.endName = label
-    afterPickResolved('end',label,true)
-  }
-}
-/* ============ 打开 / 关闭路径面板 ============ */
-async function openRoutePanel(){
-  routePanelShow.value = true
-  await nextTick()
-  await initRoutePlugins()
-  mapClickStatus.value = 1
-  routeClickTip.value = "🔵输入地点搜索，或点击地图拾取【起点】"
-  route.value = {startName:'',endName:'',startLngLat:null,endLngLat:null}
-  clearRouteDraw()
-  autoStart = new window.AMap.AutoComplete({ input:'inputStart', city:'上海市', citylimit:false })
-  autoStart.on('select', async (e)=>{
-    const name = e.poi?.name || route.value.startName
-    route.value.startName = name
-    if(e.poi && e.poi.location && typeof e.poi.location.getLng === 'function'){
-      route.value.startLngLat = e.poi.location
-      afterPickResolved('start',name,true)
-    }else{
-      routeClickTip.value = '🔍正在解析起点坐标…'
-      const r = await nameToLngLat(name)
-      if(r) route.value.startLngLat = r.lnglat
-      afterPickResolved('start',name,!!r)
-    }
-  })
-  autoEnd = new window.AMap.AutoComplete({ input:'inputEnd', city:'上海市', citylimit:false })
-  autoEnd.on('select', async (e)=>{
-    const name = e.poi?.name || route.value.endName
-    route.value.endName = name
-    if(e.poi && e.poi.location && typeof e.poi.location.getLng === 'function'){
-      route.value.endLngLat = e.poi.location
-      afterPickResolved('end',name,true)
-    }else{
-      routeClickTip.value = '🔍正在解析终点坐标…'
-      const r = await nameToLngLat(name)
-      if(r) route.value.endLngLat = r.lnglat
-      afterPickResolved('end',name,!!r)
-    }
-  })
-  if(map && !isMapPickBind){
-    map.on('click', handleMapPick)
-    isMapPickBind = true
-  }
-}
-function closeRoutePanel(){
-  routePanelShow.value = false
-  mapClickStatus.value = 0
-  autoStart = null
-  autoEnd = null
-  document.querySelectorAll('.amap-sug-result').forEach(el=>el.remove())
-  if(map && isMapPickBind){
-    map.off('click', handleMapPick)
-    isMapPickBind = false
-  }
-  clearRouteDraw()
-}
-/* ============ 生成步行路径 ============ */
-async function doRouteSearch(){
-  if(!map) return alert('地图尚未加载完成，请稍后再试')
-  await initRoutePlugins()
-  if(!route.value.startLngLat && route.value.startName){
-    routeClickTip.value = '🔍正在解析起点坐标…'
-    const r = await nameToLngLat(route.value.startName)
-    if(r) route.value.startLngLat = r.lnglat
-  }
-  if(!route.value.endLngLat && route.value.endName){
-    routeClickTip.value = '🔍正在解析终点坐标…'
-    const r = await nameToLngLat(route.value.endName)
-    if(r) route.value.endLngLat = r.lnglat
-  }
-  const s = route.value.startLngLat
-  const e2 = route.value.endLngLat
-  if(!route.value.startName || !route.value.endName){
-    return alert('请设置起点、终点：输入搜索地点，或者点击地图拾取坐标！')
-  }
-  if(walking){ walking.clear(); walking = null }
-  walking = new window.AMap.Walking({
-    map:map,
-    hideMarkers:false,
-    autoFitView:true
-  })
-  const done = (status,result)=>{
-    if(status === 'complete'){
-      const r = result.routes?.[0]
-      if(r){
-        routeClickTip.value =
-          `🚶 ${route.value.startName} → ${route.value.endName}｜` +
-          `全程 ${(r.distance/1000).toFixed(2)} 公里 · 步行约 ${Math.round(r.time/60)} 分钟`
-      }else{
-        routeClickTip.value = '✅路径已生成'
-      }
-    }else{
-      alert('路径规划失败：' + (result?.info || status) + '，请更换点位重试')
-    }
-  }
-  if(s && e2){
-    walking.search(s, e2, done)
-  }else{
-    walking.search([
-      { keyword: route.value.startName, city:'上海市' },
-      { keyword: route.value.endName, city:'上海市' }
-    ], done)
-  }
-}
-/* ============ 清除路线 ============ */
-function clearRouteDraw(){
-  if(walking){
-    walking.clear()
-    walking = null
-  }
-  route.value = {
-    startName:'',
-    endName:'',
-    startLngLat:null,
-    endLngLat:null
-  }
-  mapClickStatus.value = 1
-  routeClickTip.value = "🔵输入地点搜索，或点击地图拾取【起点】"
-}
-
 const handleLogout = ()=>{
   clearStorage()
   userInfo.value=null
@@ -445,10 +211,7 @@ async function handleLoadPoint(){
 function clearAllMarker(){
   if(!map) return
   map.clearMap()
-  if(walking){
-    walking.clear()
-    walking = null
-  }
+  routePlannerRef.value?.clearRoute()
 }
 async function loadMedicalPoint(type){
   let url = '/medical/point'
@@ -490,13 +253,14 @@ async function loadMedicalPoint(type){
     const infoWin = new window.AMap.InfoWindow({ content:infoWinContent })
     marker.on('click',()=>{
       infoWin.open(map,marker.getPosition())
+      routePlannerRef.value?.selectPoint({name:item.name,lngLat:[item.lng,item.lat]})
     })
   })
 }
 async function loadCommunityPoint(){
   const res = await request.get('/gisExtra/communityByRadius?lng=121.54&lat=31.22&radius=20000')
   res.data.forEach(item=>{
-    new window.AMap.Marker({
+    const marker = new window.AMap.Marker({
       position:[item.lng,item.lat],
       title:item.name,
       content:`
@@ -504,6 +268,9 @@ async function loadCommunityPoint(){
       `,
       offset: new window.AMap.Pixel(-7,-7),
       map:map
+    })
+    marker.on('click',()=>{
+      routePlannerRef.value?.selectPoint({name:item.name,lngLat:[item.lng,item.lat]})
     })
   })
 }
@@ -534,15 +301,6 @@ async function confirmSiteEval(){alert('保存完成')}
 onUnmounted(()=>{
   chartTotal?.dispose()
   chartType?.dispose()
-  if (walking) walking.clear()
-  walking = null
-  geocoder = null
-  placeSearch = null
-  if(map && isMapPickBind){
-    map.off('click', handleMapPick)
-    isMapPickBind = false
-  }
-  document.querySelectorAll('.amap-sug-result').forEach(el=>el.remove())
 })
 </script>
 
@@ -716,65 +474,6 @@ onUnmounted(()=>{
   flex:1;
   position:relative;
   min-width:0;
-}
-/* 路径规划悬浮面板 */
-.route-panel{
-  position:absolute;
-  left:16px;
-  top:16px;
-  width:300px;
-  background:rgba(13,28,51,0.95);
-  border:1px solid #27416b;
-  border-radius:6px;
-  padding:12px;
-  z-index:999;
-  box-shadow:0 4px 16px rgba(0,0,0,0.4);
-}
-.route-title{
-  font-size:14px;
-  color:#4fc3f7;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:10px;
-}
-.close-btn{
-  cursor:pointer;
-  font-size:18px;
-  color:#9db8dd;
-}
-.close-btn:hover{color:#fff;}
-.route-form-item{
-  margin-bottom:8px;
-}
-.route-form-item label{
-  display:block;
-  font-size:12px;
-  color:#9db8dd;
-  margin-bottom:4px;
-}
-.route-input{
-  width:100%;
-  height:30px;
-  background:#0a1728;
-  border:1px solid #27416b;
-  color:#d0e4ff;
-  border-radius:4px;
-  padding:0 8px;
-}
-.route-tip{
-  font-size:12px;
-  color:#ffd54f;
-  line-height:1.5;
-  margin:8px 0;
-  min-height:32px;
-}
-.route-btn-row{
-  display:flex;
-  gap:8px;
-}
-.route-btn{
-  height:30px;
 }
 /* 右侧统计 */
 .aside-right{
