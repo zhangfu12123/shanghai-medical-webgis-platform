@@ -1,3 +1,4 @@
+require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const path = require('path')
@@ -9,11 +10,13 @@ const medicalRouter = require('./routes/medicalApi')
 // 修改这里
 const userModule = require('./routes/userApi')
 const userRouter = userModule.router
-
 const commentRouter = require('./routes/commentApi')
 const statRouter = require('./routes/statApi')
 const collectRouter = require('./routes/collectApi')
 const gisExtraRouter = require('./routes/gisExtraApi')
+// =========新增AI路由导入==========
+const aiRouter = require('./routes/aiApi')
+
 const app = express()
 const PORT = 3000
 app.use(cors())
@@ -43,6 +46,9 @@ app.use('/api/comment', commentRouter)
 app.use('/api/stat', statRouter)
 app.use('/api/collect', collectRouter)
 app.use('/api/gisExtra', gisExtraRouter)
+// =========新增挂载AI接口==========
+app.use('/api/ai', aiRouter)
+
 //全局错误捕获
 app.use((err, req, res, next) => {
     console.error(err)
