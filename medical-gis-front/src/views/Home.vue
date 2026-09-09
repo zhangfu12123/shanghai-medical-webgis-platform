@@ -43,6 +43,7 @@
           <div class="menu-item" @click="openRoutePanel">路径规划</div>
           <div class="menu-item" @click="create15MinBuffer">15分钟服务圈</div>
           <div class="menu-item" @click="toggleStatPanel">系统统计</div>
+          <div class="menu-item" @click="aiDialogVisible=true">AI就医咨询</div>
         </div>
         <div class="panel-block tip-block">
           <div class="block-title">操作提示</div>
@@ -95,17 +96,29 @@
         </div>
       </div>
     </div>
+
+    <!-- AI聊天弹窗组件，抽离到外部文件 -->
+    <AiChatDialog ref="aiChatRef" :visible="aiDialogVisible" @close="aiDialogVisible=false" />
+
   </div>
 </template>
+
 <script setup>
 import {ref,onUnmounted,nextTick,onMounted} from 'vue'
 import {useRouter} from 'vue-router'
 import MapContainer from '../components/MapContainer.vue'
+//引入抽离的AI弹窗组件
+import AiChatDialog from '../components/AiChatDialog.vue'
 import request from '../api/request'
 import * as turf from '@turf/turf'
 import * as echarts from 'echarts'
 import {getUserInfo,clearStorage} from '../utils/storage'
 const router = useRouter()
+
+// AI弹窗状态
+const aiDialogVisible = ref(false)
+const aiChatRef = ref(null)
+
 let map = null
 let chartTotal = null
 let chartType = null
@@ -123,6 +136,7 @@ const showSiteModal = ref(false)
 const siteTip = ref('点击地图获取选址坐标')
 const evalNameInput = ref('')
 const statPanelVisible = ref(false)
+
 //路径规划
 const routePanelShow = ref(false)
 const routeClickTip = ref("🔵输入地点搜索，或点击地图拾取【起点】")
@@ -198,7 +212,7 @@ function initRoutePlugins(){
       // 注意：不要传 map，否则每次解析都会在地图上撒点
       placeSearch = new window.AMap.PlaceSearch({
         city:'上海市',
-        citylimit:false,   // 浦东业务优先，搜不到时全国兜底
+        citylimit:false,
         pageSize:1,
         extensions:'base'
       })
@@ -262,7 +276,7 @@ async function handleMapPick(e){
   const label = addr || `${lnglat.getLng().toFixed(6)},${lnglat.getLat().toFixed(6)}`
   if(mapClickStatus.value === 1){
     route.value.startLngLat = lnglat
-    route.value.startName = label   // v-model 自动回填到输入框
+    route.value.startName = label
     afterPickResolved('start',label,true)
   }else if(mapClickStatus.value === 2){
     route.value.endLngLat = lnglat
@@ -275,17 +289,14 @@ async function openRoutePanel(){
   routePanelShow.value = true
   await nextTick()
   await initRoutePlugins()
-  //重置
   mapClickStatus.value = 1
   routeClickTip.value = "🔵输入地点搜索，或点击地图拾取【起点】"
   route.value = {startName:'',endName:'',startLngLat:null,endLngLat:null}
   clearRouteDraw()
-  // 联想实例：每次打开重新绑定新 input（v-if 会重建 DOM）
   autoStart = new window.AMap.AutoComplete({ input:'inputStart', city:'上海市', citylimit:false })
   autoStart.on('select', async (e)=>{
     const name = e.poi?.name || route.value.startName
     route.value.startName = name
-    // 联想结果自带坐标直接用；没有则用 PlaceSearch 补齐（e.poi.location 常为空）
     if(e.poi && e.poi.location && typeof e.poi.location.getLng === 'function'){
       route.value.startLngLat = e.poi.location
       afterPickResolved('start',name,true)
@@ -310,7 +321,6 @@ async function openRoutePanel(){
       afterPickResolved('end',name,!!r)
     }
   })
-  //绑定地图点击拾取
   if(map && !isMapPickBind){
     map.on('click', handleMapPick)
     isMapPickBind = true
@@ -321,7 +331,6 @@ function closeRoutePanel(){
   mapClickStatus.value = 0
   autoStart = null
   autoEnd = null
-  // 清掉高德联想残留在 body 上的下拉面板
   document.querySelectorAll('.amap-sug-result').forEach(el=>el.remove())
   if(map && isMapPickBind){
     map.off('click', handleMapPick)
@@ -333,7 +342,6 @@ function closeRoutePanel(){
 async function doRouteSearch(){
   if(!map) return alert('地图尚未加载完成，请稍后再试')
   await initRoutePlugins()
-  // 手输地名但没点联想 -> 现查坐标
   if(!route.value.startLngLat && route.value.startName){
     routeClickTip.value = '🔍正在解析起点坐标…'
     const r = await nameToLngLat(route.value.startName)
@@ -349,7 +357,6 @@ async function doRouteSearch(){
   if(!route.value.startName || !route.value.endName){
     return alert('请设置起点、终点：输入搜索地点，或者点击地图拾取坐标！')
   }
-  // 关键：先销毁旧实例，否则多次规划会叠加多条路线
   if(walking){ walking.clear(); walking = null }
   walking = new window.AMap.Walking({
     map:map,
@@ -371,10 +378,8 @@ async function doRouteSearch(){
     }
   }
   if(s && e2){
-    // 坐标模式（最准）
     walking.search(s, e2, done)
   }else{
-    // 真实地名模式：直接把中文地名交给高德
     walking.search([
       { keyword: route.value.startName, city:'上海市' },
       { keyword: route.value.endName, city:'上海市' }
@@ -396,6 +401,7 @@ function clearRouteDraw(){
   mapClickStatus.value = 1
   routeClickTip.value = "🔵输入地点搜索，或点击地图拾取【起点】"
 }
+
 const handleLogout = ()=>{
   clearStorage()
   userInfo.value=null
@@ -524,6 +530,7 @@ function openSiteDialog(){
 }
 function closeSiteModal(){showSiteModal.value=false}
 async function confirmSiteEval(){alert('保存完成')}
+
 onUnmounted(()=>{
   chartTotal?.dispose()
   chartType?.dispose()
@@ -538,6 +545,7 @@ onUnmounted(()=>{
   document.querySelectorAll('.amap-sug-result').forEach(el=>el.remove())
 })
 </script>
+
 <style scoped>
 *{margin:0;padding:0;box-sizing:border-box;}
 .app-wrap{
@@ -719,7 +727,7 @@ onUnmounted(()=>{
   border:1px solid #27416b;
   border-radius:6px;
   padding:12px;
-  z-index:999;   /* 防止被地图覆盖 */
+  z-index:999;
   box-shadow:0 4px 16px rgba(0,0,0,0.4);
 }
 .route-title{
