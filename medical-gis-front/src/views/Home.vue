@@ -10,11 +10,14 @@
         <template v-if="!userInfo">
           <button class="top-btn" @click="$router.push('/login')">登录</button>
           <button class="top-btn" @click="$router.push('/register')">注册</button>
+          <!-- 公告入口，未登录也可以看公告 -->
+          <button class="top-btn" @click="$router.push('/notice')">📢 系统公告</button>
         </template>
         <template v-else>
           <span class="user-text">{{userInfo.username}}</span>
           <span class="tag-admin" v-if="userInfo.role==='admin'">管理员</span>
           <button class="top-btn" @click="$router.push('/personal')">个人中心</button>
+          <button class="top-btn" @click="$router.push('/notice')">📢 系统公告</button>
           <button class="top-btn btn-logout" @click="handleLogout">退出</button>
         </template>
       </div>
@@ -96,10 +99,8 @@
         </div>
       </div>
     </div>
-
     <!-- AI聊天弹窗组件，抽离到外部文件 -->
     <AiChatDialog ref="aiChatRef" :visible="aiDialogVisible" @close="aiDialogVisible=false" />
-
   </div>
 </template>
 
@@ -114,11 +115,9 @@ import * as turf from '@turf/turf'
 import * as echarts from 'echarts'
 import {getUserInfo,clearStorage} from '../utils/storage'
 const router = useRouter()
-
 // AI弹窗状态
 const aiDialogVisible = ref(false)
 const aiChatRef = ref(null)
-
 let map = null
 let chartTotal = null
 let chartType = null
@@ -136,7 +135,6 @@ const showSiteModal = ref(false)
 const siteTip = ref('点击地图获取选址坐标')
 const evalNameInput = ref('')
 const statPanelVisible = ref(false)
-
 //路径规划
 const routePanelShow = ref(false)
 const routeClickTip = ref("🔵输入地点搜索，或点击地图拾取【起点】")
@@ -151,6 +149,7 @@ const mapClickStatus = ref(0)
 const medicalTypeList = ref([])
 let tempSiteLng=null
 let tempSiteLat=null
+
 onMounted(async ()=>{
   try{
     const res = await request.get('/stat/countByType')
@@ -159,6 +158,7 @@ onMounted(async ()=>{
     console.error("读取医疗点位类型失败",e)
   }
 })
+
 //全局挂载给infoWindow内部onclick
 window.collectPoint = async function(pointId){
   if(!userInfo.value) return alert("请登录")
@@ -169,6 +169,7 @@ window.collectPoint = async function(pointId){
     alert(err?.msg||"收藏失败")
   }
 }
+
 window.loadPointComment = async function(pointId){
   const res = await request.get(`/comment/list/${pointId}`)
   const box = document.getElementById("commentListBox")
@@ -183,6 +184,7 @@ window.loadPointComment = async function(pointId){
   }
   box.innerHTML = html
 }
+
 window.submitComment = async function(pointId){
   if(!userInfo.value) return alert("请登录")
   const content = document.getElementById("commentText").value
@@ -196,10 +198,21 @@ window.submitComment = async function(pointId){
   })
   alert("留言提交成功，点击查看全部留言刷新")
 }
+
+// ✅ 新增：高德弹窗官方关闭API，不能只隐藏DOM
+window.globalActiveInfoWin = null
+window.closeCurrentInfoWin = function(){
+  if(window.globalActiveInfoWin){
+    window.globalActiveInfoWin.close()
+    window.globalActiveInfoWin = null
+  }
+}
+
 //地图初始化
 const onMapReady = (m)=>{
   map = m
 }
+
 /* ============ 路径规划核心工具：插件初始化 / 地名↔坐标 ============ */
 function initRoutePlugins(){
   if(routePluginsReady) return Promise.resolve()
@@ -221,6 +234,7 @@ function initRoutePlugins(){
     })
   })
 }
+
 // 坐标 -> 真实地名（逆地理编码）
 function lnglatToName(lnglat){
   return new Promise((resolve)=>{
@@ -234,6 +248,7 @@ function lnglatToName(lnglat){
     })
   })
 }
+
 // 真实地名 -> 坐标（POI 搜索，用于联想结果无坐标 / 纯手输场景）
 function nameToLngLat(name){
   return new Promise((resolve)=>{
@@ -248,6 +263,7 @@ function nameToLngLat(name){
     })
   })
 }
+
 // 统一处理“选中/解析”成功后的状态推进
 function afterPickResolved(which,name,ok){
   if(which==='start'){
@@ -266,6 +282,7 @@ function afterPickResolved(which,name,ok){
     }
   }
 }
+
 /* ============ 地图点击拾取：坐标 -> 真实地名回填 ============ */
 async function handleMapPick(e){
   if(!mapClickStatus.value) return
@@ -284,6 +301,7 @@ async function handleMapPick(e){
     afterPickResolved('end',label,true)
   }
 }
+
 /* ============ 打开 / 关闭路径面板 ============ */
 async function openRoutePanel(){
   routePanelShow.value = true
@@ -326,6 +344,7 @@ async function openRoutePanel(){
     isMapPickBind = true
   }
 }
+
 function closeRoutePanel(){
   routePanelShow.value = false
   mapClickStatus.value = 0
@@ -338,6 +357,7 @@ function closeRoutePanel(){
   }
   clearRouteDraw()
 }
+
 /* ============ 生成步行路径 ============ */
 async function doRouteSearch(){
   if(!map) return alert('地图尚未加载完成，请稍后再试')
@@ -386,6 +406,7 @@ async function doRouteSearch(){
     ], done)
   }
 }
+
 /* ============ 清除路线 ============ */
 function clearRouteDraw(){
   if(walking){
@@ -407,6 +428,7 @@ const handleLogout = ()=>{
   userInfo.value=null
   router.push('/login')
 }
+
 async function toggleStatPanel(){
   statPanelVisible.value = !statPanelVisible.value
   if(statPanelVisible.value){
@@ -414,6 +436,7 @@ async function toggleStatPanel(){
     refreshStat()
   }
 }
+
 async function refreshStat(){
   if(chartTotal){
     chartTotal.dispose()
@@ -434,6 +457,7 @@ async function refreshStat(){
     series:[{type:'bar',data:resType.data.map(i=>i.cnt)}]
   })
 }
+
 async function handleLoadPoint(){
   if(!loadPointType.value) return alert("请选择点位类型")
   if(loadPointType.value === 'community'){
@@ -442,6 +466,7 @@ async function handleLoadPoint(){
     await loadMedicalPoint(loadPointType.value)
   }
 }
+
 function clearAllMarker(){
   if(!map) return
   map.clearMap()
@@ -450,6 +475,7 @@ function clearAllMarker(){
     walking = null
   }
 }
+
 async function loadMedicalPoint(type){
   let url = '/medical/point'
   if(type) url +=`?type=${encodeURIComponent(type)}`
@@ -464,35 +490,55 @@ async function loadMedicalPoint(type){
       offset: new window.AMap.Pixel(-9,-9),
       map:map
     })
+
     const infoWinContent = `
-      <div style="min-width:300px;background:#ffffff;color:#000000;">
-        <h4>${item.name}</h4>
-        <p>类型：${item.type}</p>
-        <p>地址：${item.address || '无'}</p>
-        <p>电话：${item.phone || '无'}</p>
-        <p>等级：${item.level || '无'}</p>
-        <button onclick="window.collectPoint(${item.id})">收藏点位</button>
-        <button onclick="window.loadPointComment(${item.id})">查看全部留言</button>
-        <div>
-          <textarea id="commentText" placeholder="输入留言"></textarea>
-          <br>
-          <select id="starSel">
+    <div style="position:relative;min-width:360px;max-width:380px;background:#0b1a30;border-radius:10px;border:1px solid #e5393544;padding:16px;box-shadow:0 6px 22px rgba(0,0,0,0.6);font-family:system-ui;overflow:hidden;">
+      <!-- 医疗红十字水印背景装饰 -->
+      <div style="position:absolute;right:-20px;top:-20px;width:100px;height:100px;opacity:0.08;pointer-events:none;">
+        <div style="width:100%;height:100%;position:relative;">
+          <div style="position:absolute;left:50%;top:15px;width:12px;height:70px;background:#e53935;transform:translateX(-50%);border-radius:3px;"></div>
+          <div style="position:absolute;top:50%;left:15px;width:70px;height:12px;background:#e53935;transform:translateY(-50%);border-radius:3px;"></div>
+        </div>
+      </div>
+      <!-- 调用全局关闭函数，不再操作DOM -->
+      <span onclick="window.closeCurrentInfoWin()" style="position:absolute;top:10px;right:12px;font-size:20px;color:#9db8dd;cursor:pointer;z-index:10;">×</span>
+      <h4 style="color:#4fc3f7;margin:0 0 12px 0;font-size:18px;padding-right:24px;">${item.name}</h4>
+      <p style="margin:7px 0;font-size:14px;color:#b3e5fc;">类型：${item.type}</p>
+      <p style="margin:7px 0;font-size:14px;color:#b3e5fc;">地址：${item.address || '无'}</p>
+      <p style="margin:7px 0;font-size:14px;color:#b3e5fc;">电话：${item.phone || '无'}</p>
+      <p style="margin:7px 0;font-size:14px;color:#b3e5fc;">等级：${item.level || '无'}</p>
+      <div style="display:flex;gap:10px;margin:14px 0;">
+        <button onclick="window.collectPoint(${item.id})" style="flex:1;padding:7px 6px;background:rgba(30,136,229,0.2);border:1px solid #27416b;color:#d0e4ff;border-radius:4px;cursor:pointer;font-size:14px;">收藏点位</button>
+        <button onclick="window.loadPointComment(${item.id})" style="flex:1;padding:7px 6px;background:rgba(30,136,229,0.2);border:1px solid #27416b;color:#d0e4ff;border-radius:4px;cursor:pointer;font-size:14px;">查看全部留言</button>
+      </div>
+      <div>
+        <textarea id="commentText" placeholder="输入留言" style="width:100%;background:#0a1728;border:1px solid #27416b;color:#d0e4ff;border-radius:4px;padding:9px;min-height:72px;resize:vertical;box-sizing:border-box;font-size:14px;"></textarea>
+        <div style="display:flex;gap:10px;margin-top:10px;align-items:center;">
+          <select id="starSel" style="flex:1;height:34px;background:#0a1728;border:1px solid #27416b;color:#d0e4ff;border-radius:4px;padding-left:8px;font-size:14px;">
             <option value="1">★</option>
             <option value="2">★★</option>
             <option value="3">★★★</option>
             <option value="4">★★★★</option>
             <option value="5">★★★★★</option>
           </select>
-          <button onclick="window.submitComment(${item.id})">提交留言评分</button>
+          <button onclick="window.submitComment(${item.id})" style="padding:8px 14px;background:rgba(79,195,247,0.22);border:1px solid #4fc3f7;color:#b3e5fc;border-radius:4px;cursor:pointer;font-size:14px;">提交留言评分</button>
         </div>
-        <div id="commentListBox"></div>
-      </div>`
-    const infoWin = new window.AMap.InfoWindow({ content:infoWinContent })
+      </div>
+      <div id="commentListBox" style="margin-top:12px;color:#9db8dd;font-size:13px;max-height:140px;overflow-y:auto;"></div>
+    </div>`
+
+    const infoWin = new window.AMap.InfoWindow({
+      content:infoWinContent,
+      isCustom:true
+    })
     marker.on('click',()=>{
+      // 将当前弹窗实例保存给全局，关闭按钮调用
+      window.globalActiveInfoWin = infoWin
       infoWin.open(map,marker.getPosition())
     })
   })
 }
+
 async function loadCommunityPoint(){
   const res = await request.get('/gisExtra/communityByRadius?lng=121.54&lat=31.22&radius=20000')
   res.data.forEach(item=>{
@@ -507,6 +553,7 @@ async function loadCommunityPoint(){
     })
   })
 }
+
 async function create15MinBuffer(){
   const res = await request.get('/medical/siteQuery')
   res.data.forEach(p=>{
@@ -520,6 +567,7 @@ async function create15MinBuffer(){
     })
   })
 }
+
 function openSiteDialog(){
   map.once('click',e=>{
     tempSiteLng = e.lnglat.lng
@@ -528,6 +576,7 @@ function openSiteDialog(){
     showSiteModal.value=true
   })
 }
+
 function closeSiteModal(){showSiteModal.value=false}
 async function confirmSiteEval(){alert('保存完成')}
 

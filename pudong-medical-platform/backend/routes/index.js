@@ -3,7 +3,6 @@ const fs = require('fs')
 const path = require('path')
 const router = express.Router()
 const { getPool, sql } = require('../db/db')
-
 // //浦东新区边界geojson
 // router.get('/boundary', (req, res) => {
 //     const filePath = path.join(__dirname, "../static/pudong_boundary.geojson")
@@ -12,7 +11,6 @@ const { getPool, sql } = require('../db/db')
 //         return res.success(JSON.parse(data))
 //     })
 // })
-
 // //路网geojson（高德路径规划不需要，暂时注释）
 // router.get('/roadnet', (req, res) => {
 //     const filePath = path.join(__dirname, "../static/pudong_road.geojson")
@@ -21,7 +19,6 @@ const { getPool, sql } = require('../db/db')
 //         return res.success(JSON.parse(data))
 //     })
 // })
-
 //获取全部小区点位 community表
 router.get('/community', async (req, res) => {
     try {
