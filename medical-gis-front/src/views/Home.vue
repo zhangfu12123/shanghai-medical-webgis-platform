@@ -10,7 +10,6 @@
         <template v-if="!userInfo">
           <button class="top-btn" @click="$router.push('/login')">登录</button>
           <button class="top-btn" @click="$router.push('/register')">注册</button>
-          <!-- 公告入口，未登录也可以看公告 -->
           <button class="top-btn" @click="$router.push('/notice')">📢 系统公告</button>
         </template>
         <template v-else>
@@ -22,9 +21,7 @@
         </template>
       </div>
     </header>
-    <!-- ==========主体三栏布局 左｜中地图｜右统计========== -->
     <div class="main-container">
-      <!-- 左侧功能区 -->
       <aside class="aside-left">
         <div class="panel-block">
           <div class="block-title">资源加载</div>
@@ -53,10 +50,8 @@
           <p class="tip-desc">进入系统后地图默认空白，请先在上方选择点位类型并点击加载点位。</p>
         </div>
       </aside>
-      <!-- 中间：高德地图区域 -->
       <section class="map-wrap">
         <MapContainer @map-ready="onMapReady" />
-        <!-- 路径规划悬浮面板：输入联想 + 地图点击拾取 -->
         <div class="route-panel" v-if="routePanelShow">
           <div class="route-title">
             步行路径规划
@@ -75,6 +70,10 @@
             <button class="btn-primary route-btn" @click="doRouteSearch">生成路径</button>
             <button class="btn-gray route-btn" @click="clearRouteDraw">清除路线</button>
           </div>
+        </div>
+        <!-- 轻提示，小方块自动消失，不alert弹窗 -->
+        <div class="toast-wrap" v-if="toast.show">
+          <div class="toast-box" :class="toast.type">{{toast.msg}}</div>
         </div>
       </section>
       <aside class="aside-right" v-show="statPanelVisible">
@@ -99,7 +98,6 @@
         </div>
       </div>
     </div>
-    <!-- AI聊天弹窗组件，抽离到外部文件 -->
     <AiChatDialog ref="aiChatRef" :visible="aiDialogVisible" @close="aiDialogVisible=false" />
   </div>
 </template>
@@ -108,14 +106,15 @@
 import {ref,onUnmounted,nextTick,onMounted} from 'vue'
 import {useRouter} from 'vue-router'
 import MapContainer from '../components/MapContainer.vue'
-//引入抽离的AI弹窗组件
 import AiChatDialog from '../components/AiChatDialog.vue'
 import request from '../api/request'
 import * as turf from '@turf/turf'
 import * as echarts from 'echarts'
 import {getUserInfo,clearStorage} from '../utils/storage'
+// 引入抽离的弹窗工具
+import {buildPointPopupHtml, bindPopupDomEvent} from '../utils/popupHelper'
+
 const router = useRouter()
-// AI弹窗状态
 const aiDialogVisible = ref(false)
 const aiChatRef = ref(null)
 let map = null
@@ -125,7 +124,6 @@ let walking = null
 let autoStart = null
 let autoEnd = null
 let isMapPickBind = false
-// 新增：地理编码 / POI 搜索实例（只初始化一次）
 let geocoder = null
 let placeSearch = null
 let routePluginsReady = false
@@ -135,7 +133,6 @@ const showSiteModal = ref(false)
 const siteTip = ref('点击地图获取选址坐标')
 const evalNameInput = ref('')
 const statPanelVisible = ref(false)
-//路径规划
 const routePanelShow = ref(false)
 const routeClickTip = ref("🔵输入地点搜索，或点击地图拾取【起点】")
 const route = ref({
@@ -144,11 +141,24 @@ const route = ref({
   startLngLat:null,
   endLngLat:null
 })
-//0关闭拾取，1拾取起点，2拾取终点
 const mapClickStatus = ref(0)
 const medicalTypeList = ref([])
 let tempSiteLng=null
 let tempSiteLat=null
+let currentInfoWin = null
+
+//轻提示
+const toast = ref({
+  show:false,
+  msg:'',
+  type:'success'
+})
+function showToast(msg,type='success'){
+  toast.value.msg = msg
+  toast.value.type = type
+  toast.value.show = true
+  setTimeout(()=>{toast.value.show=false},2500)
+}
 
 onMounted(async ()=>{
   try{
@@ -159,131 +169,53 @@ onMounted(async ()=>{
   }
 })
 
-//全局挂载给infoWindow内部onclick
-window.collectPoint = async function(pointId){
-  if(!userInfo.value) return alert("请登录")
-  try{
-    const res = await request.post('/collect/addCollect',{user_id:userInfo.value.userId,point_id:pointId})
-    alert(res.msg)
-  }catch(err){
-    alert(err?.msg||"收藏失败")
-  }
-}
-
-window.loadPointComment = async function(pointId){
-  const res = await request.get(`/comment/list/${pointId}`)
-  const box = document.getElementById("commentListBox")
-  if(!box) return
-  let html = "<hr><b>用户留言：</b><br>"
-  if(res.data.length===0){
-    html += "<p>暂无留言</p>"
-  }else{
-    res.data.forEach(c=>{
-      html += `<div style="margin:4px 0;border-bottom:1px solid #445;"><span>用户：${c.content} | ${c.star}星</span></div>`
-    })
-  }
-  box.innerHTML = html
-}
-
-window.submitComment = async function(pointId){
-  if(!userInfo.value) return alert("请登录")
-  const content = document.getElementById("commentText").value
-  const star = document.getElementById("starSel").value
-  if(!content.trim()) return alert("留言不能为空")
-  await request.post('/comment/add',{
-    point_id:pointId,
-    user_id:userInfo.value.userId,
-    content,
-    star:Number(star)
-  })
-  alert("留言提交成功，点击查看全部留言刷新")
-}
-
-// ✅ 新增：高德弹窗官方关闭API，不能只隐藏DOM
-window.globalActiveInfoWin = null
-window.closeCurrentInfoWin = function(){
-  if(window.globalActiveInfoWin){
-    window.globalActiveInfoWin.close()
-    window.globalActiveInfoWin = null
-  }
-}
-
-//地图初始化
 const onMapReady = (m)=>{
   map = m
 }
 
-/* ============ 路径规划核心工具：插件初始化 / 地名↔坐标 ============ */
 function initRoutePlugins(){
   if(routePluginsReady) return Promise.resolve()
   return new Promise((resolve)=>{
     window.AMap.plugin(['AMap.Geocoder','AMap.PlaceSearch','AMap.Walking'],()=>{
-      geocoder = new window.AMap.Geocoder({
-        city:'上海市',
-        radius:1000
-      })
-      // 注意：不要传 map，否则每次解析都会在地图上撒点
-      placeSearch = new window.AMap.PlaceSearch({
-        city:'上海市',
-        citylimit:false,
-        pageSize:1,
-        extensions:'base'
-      })
+      geocoder = new window.AMap.Geocoder({city:'上海市',radius:1000})
+      placeSearch = new window.AMap.PlaceSearch({city:'上海市',citylimit:false,pageSize:1,extensions:'base'})
       routePluginsReady = true
       resolve()
     })
   })
 }
 
-// 坐标 -> 真实地名（逆地理编码）
 function lnglatToName(lnglat){
   return new Promise((resolve)=>{
     geocoder.getAddress(lnglat,(status,result)=>{
       if(status==='complete' && result.regeocode){
         resolve(result.regeocode.formattedAddress || '')
-      }else{
-        console.warn('逆地理编码失败',status,result)
-        resolve('')
-      }
+      }else resolve('')
     })
   })
 }
 
-// 真实地名 -> 坐标（POI 搜索，用于联想结果无坐标 / 纯手输场景）
 function nameToLngLat(name){
   return new Promise((resolve)=>{
     placeSearch.search(name,(status,result)=>{
       const pois = result?.poiList?.pois || []
       if(status==='complete' && pois.length){
         resolve({ name:pois[0].name, lnglat:pois[0].location })
-      }else{
-        console.warn('POI搜索无结果',status,result)
-        resolve(null)
-      }
+      }else resolve(null)
     })
   })
 }
 
-// 统一处理“选中/解析”成功后的状态推进
 function afterPickResolved(which,name,ok){
   if(which==='start'){
-    if(ok){
-      mapClickStatus.value = 2
-      routeClickTip.value = `✅起点：${name}｜请再选择终点（输入或点地图）`
-    }else{
-      routeClickTip.value = `❌未解析到「${name}」的坐标，请换关键词或点击地图拾取`
-    }
+    mapClickStatus.value = ok ?2:1
+    routeClickTip.value = ok ?`✅起点：${name}｜请再选择终点（输入或点地图拾取）`:`❌未解析到「${name}」的坐标，请换关键词或点击地图拾取`
   }else{
-    if(ok){
-      mapClickStatus.value = 1
-      routeClickTip.value = `✅终点：${name}｜点击「生成路径」，或继续点地图重选起点`
-    }else{
-      routeClickTip.value = `❌未解析到「${name}」的坐标，请换关键词或点击地图拾取`
-    }
+    mapClickStatus.value = ok ?1:2
+    routeClickTip.value = ok ?`✅终点：${name}｜点击「生成路径」，或继续点地图重选起点`:`❌未解析到「${name}」的坐标，请换关键词或点击地图拾取`
   }
 }
 
-/* ============ 地图点击拾取：坐标 -> 真实地名回填 ============ */
 async function handleMapPick(e){
   if(!mapClickStatus.value) return
   const lnglat = e.lnglat
@@ -291,23 +223,22 @@ async function handleMapPick(e){
   routeClickTip.value = '🔍正在解析该点地址…'
   const addr = await lnglatToName(lnglat)
   const label = addr || `${lnglat.getLng().toFixed(6)},${lnglat.getLat().toFixed(6)}`
-  if(mapClickStatus.value === 1){
+  if(mapClickStatus.value ===1){
     route.value.startLngLat = lnglat
     route.value.startName = label
     afterPickResolved('start',label,true)
-  }else if(mapClickStatus.value === 2){
+  }else if(mapClickStatus.value===2){
     route.value.endLngLat = lnglat
     route.value.endName = label
     afterPickResolved('end',label,true)
   }
 }
 
-/* ============ 打开 / 关闭路径面板 ============ */
 async function openRoutePanel(){
   routePanelShow.value = true
   await nextTick()
   await initRoutePlugins()
-  mapClickStatus.value = 1
+  mapClickStatus.value =1
   routeClickTip.value = "🔵输入地点搜索，或点击地图拾取【起点】"
   route.value = {startName:'',endName:'',startLngLat:null,endLngLat:null}
   clearRouteDraw()
@@ -358,7 +289,6 @@ function closeRoutePanel(){
   clearRouteDraw()
 }
 
-/* ============ 生成步行路径 ============ */
 async function doRouteSearch(){
   if(!map) return alert('地图尚未加载完成，请稍后再试')
   await initRoutePlugins()
@@ -378,47 +308,22 @@ async function doRouteSearch(){
     return alert('请设置起点、终点：输入搜索地点，或者点击地图拾取坐标！')
   }
   if(walking){ walking.clear(); walking = null }
-  walking = new window.AMap.Walking({
-    map:map,
-    hideMarkers:false,
-    autoFitView:true
-  })
+  walking = new window.AMap.Walking({map:map,hideMarkers:false,autoFitView:true})
   const done = (status,result)=>{
     if(status === 'complete'){
       const r = result.routes?.[0]
       if(r){
-        routeClickTip.value =
-          `🚶 ${route.value.startName} → ${route.value.endName}｜` +
-          `全程 ${(r.distance/1000).toFixed(2)} 公里 · 步行约 ${Math.round(r.time/60)} 分钟`
-      }else{
-        routeClickTip.value = '✅路径已生成'
-      }
-    }else{
-      alert('路径规划失败：' + (result?.info || status) + '，请更换点位重试')
-    }
+        routeClickTip.value =`🚶 ${route.value.startName} → ${route.value.endName}｜全程 ${(r.distance/1000).toFixed(2)} 公里 · 步行约 ${Math.round(r.time/60)} 分钟`
+      }else routeClickTip.value = '✅路径已生成'
+    }else alert('路径规划失败：' + (result?.info || status) + '，请更换点位重试')
   }
-  if(s && e2){
-    walking.search(s, e2, done)
-  }else{
-    walking.search([
-      { keyword: route.value.startName, city:'上海市' },
-      { keyword: route.value.endName, city:'上海市' }
-    ], done)
-  }
+  if(s && e2) walking.search(s,e2,done)
+  else walking.search([{ keyword: route.value.startName, city:'上海市' },{ keyword: route.value.endName, city:'上海市' }], done)
 }
 
-/* ============ 清除路线 ============ */
 function clearRouteDraw(){
-  if(walking){
-    walking.clear()
-    walking = null
-  }
-  route.value = {
-    startName:'',
-    endName:'',
-    startLngLat:null,
-    endLngLat:null
-  }
+  if(walking){ walking.clear(); walking = null }
+  route.value = {startName:'',endName:'',startLngLat:null,endLngLat:null}
   mapClickStatus.value = 1
   routeClickTip.value = "🔵输入地点搜索，或点击地图拾取【起点】"
 }
@@ -438,42 +343,25 @@ async function toggleStatPanel(){
 }
 
 async function refreshStat(){
-  if(chartTotal){
-    chartTotal.dispose()
-    chartType.dispose()
-  }
+  if(chartTotal){ chartTotal.dispose(); chartType.dispose() }
   chartTotal = echarts.init(document.getElementById('chartBox'),'dark')
   chartType = echarts.init(document.getElementById('chartType'),'dark')
   const resTotal = await request.get('/stat/countAll')
   const resType = await request.get('/stat/countByType')
-  chartTotal.setOption({
-    tooltip:{},
-    series:[{type:'gauge',data:[{value:resTotal.data.total,name:'机构总数'}]}]
-  })
-  chartType.setOption({
-    tooltip:{trigger:'axis'},
-    xAxis:{data:resType.data.map(i=>i.type)},
-    yAxis:{},
-    series:[{type:'bar',data:resType.data.map(i=>i.cnt)}]
-  })
+  chartTotal.setOption({tooltip:{},series:[{type:'gauge',data:[{value:resTotal.data.total,name:'机构总数'}]}]})
+  chartType.setOption({tooltip:{trigger:'axis'},xAxis:{data:resType.data.map(i=>i.type)},yAxis:{},series:[{type:'bar',data:resType.data.map(i=>i.cnt)}]})
 }
 
 async function handleLoadPoint(){
-  if(!loadPointType.value) return alert("请选择点位类型")
-  if(loadPointType.value === 'community'){
-    await loadCommunityPoint()
-  }else{
-    await loadMedicalPoint(loadPointType.value)
-  }
+  if(!loadPointType.value) return showToast("请选择点位类型","warning")
+  if(loadPointType.value === 'community') await loadCommunityPoint()
+  else await loadMedicalPoint(loadPointType.value)
 }
 
 function clearAllMarker(){
   if(!map) return
   map.clearMap()
-  if(walking){
-    walking.clear()
-    walking = null
-  }
+  if(walking){ walking.clear(); walking = null }
 }
 
 async function loadMedicalPoint(type){
@@ -484,57 +372,22 @@ async function loadMedicalPoint(type){
     const marker = new window.AMap.Marker({
       position:[item.lng,item.lat],
       title:item.name,
-      content:`
-        <div style="width:16px;height:16px;border-radius:50%;background:#d82626;display:flex;align-items:center;justify-content:center;color:#ffffff;font-weight:bold;font-size:14px;line-height:1;">+</div>
-      `,
+      content:`<div style="width:16px;height:16px;border-radius:50%;background:#d82626;display:flex;align-items:center;justify-content:center;color:#ffffff;font-weight:bold;font-size:14px;line-height:1;">+</div>`,
       offset: new window.AMap.Pixel(-9,-9),
       map:map
     })
-
-    const infoWinContent = `
-    <div style="position:relative;min-width:360px;max-width:380px;background:#0b1a30;border-radius:10px;border:1px solid #e5393544;padding:16px;box-shadow:0 6px 22px rgba(0,0,0,0.6);font-family:system-ui;overflow:hidden;">
-      <!-- 医疗红十字水印背景装饰 -->
-      <div style="position:absolute;right:-20px;top:-20px;width:100px;height:100px;opacity:0.08;pointer-events:none;">
-        <div style="width:100%;height:100%;position:relative;">
-          <div style="position:absolute;left:50%;top:15px;width:12px;height:70px;background:#e53935;transform:translateX(-50%);border-radius:3px;"></div>
-          <div style="position:absolute;top:50%;left:15px;width:70px;height:12px;background:#e53935;transform:translateY(-50%);border-radius:3px;"></div>
-        </div>
-      </div>
-      <!-- 调用全局关闭函数，不再操作DOM -->
-      <span onclick="window.closeCurrentInfoWin()" style="position:absolute;top:10px;right:12px;font-size:20px;color:#9db8dd;cursor:pointer;z-index:10;">×</span>
-      <h4 style="color:#4fc3f7;margin:0 0 12px 0;font-size:18px;padding-right:24px;">${item.name}</h4>
-      <p style="margin:7px 0;font-size:14px;color:#b3e5fc;">类型：${item.type}</p>
-      <p style="margin:7px 0;font-size:14px;color:#b3e5fc;">地址：${item.address || '无'}</p>
-      <p style="margin:7px 0;font-size:14px;color:#b3e5fc;">电话：${item.phone || '无'}</p>
-      <p style="margin:7px 0;font-size:14px;color:#b3e5fc;">等级：${item.level || '无'}</p>
-      <div style="display:flex;gap:10px;margin:14px 0;">
-        <button onclick="window.collectPoint(${item.id})" style="flex:1;padding:7px 6px;background:rgba(30,136,229,0.2);border:1px solid #27416b;color:#d0e4ff;border-radius:4px;cursor:pointer;font-size:14px;">收藏点位</button>
-        <button onclick="window.loadPointComment(${item.id})" style="flex:1;padding:7px 6px;background:rgba(30,136,229,0.2);border:1px solid #27416b;color:#d0e4ff;border-radius:4px;cursor:pointer;font-size:14px;">查看全部留言</button>
-      </div>
-      <div>
-        <textarea id="commentText" placeholder="输入留言" style="width:100%;background:#0a1728;border:1px solid #27416b;color:#d0e4ff;border-radius:4px;padding:9px;min-height:72px;resize:vertical;box-sizing:border-box;font-size:14px;"></textarea>
-        <div style="display:flex;gap:10px;margin-top:10px;align-items:center;">
-          <select id="starSel" style="flex:1;height:34px;background:#0a1728;border:1px solid #27416b;color:#d0e4ff;border-radius:4px;padding-left:8px;font-size:14px;">
-            <option value="1">★</option>
-            <option value="2">★★</option>
-            <option value="3">★★★</option>
-            <option value="4">★★★★</option>
-            <option value="5">★★★★★</option>
-          </select>
-          <button onclick="window.submitComment(${item.id})" style="padding:8px 14px;background:rgba(79,195,247,0.22);border:1px solid #4fc3f7;color:#b3e5fc;border-radius:4px;cursor:pointer;font-size:14px;">提交留言评分</button>
-        </div>
-      </div>
-      <div id="commentListBox" style="margin-top:12px;color:#9db8dd;font-size:13px;max-height:140px;overflow-y:auto;"></div>
-    </div>`
-
+    const htmlContent = buildPointPopupHtml(item)
     const infoWin = new window.AMap.InfoWindow({
-      content:infoWinContent,
-      isCustom:true
+      content:htmlContent,
+      isCustom:true,
+      offset:new window.AMap.Pixel(0,-48),
+      closeWhenClickMap:true
     })
     marker.on('click',()=>{
-      // 将当前弹窗实例保存给全局，关闭按钮调用
-      window.globalActiveInfoWin = infoWin
+      if(currentInfoWin) currentInfoWin.close()
+      currentInfoWin = infoWin
       infoWin.open(map,marker.getPosition())
+      bindPopupDomEvent(infoWin, item, showToast)
     })
   })
 }
@@ -545,9 +398,7 @@ async function loadCommunityPoint(){
     new window.AMap.Marker({
       position:[item.lng,item.lat],
       title:item.name,
-      content:`
-        <div style="width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;">🏠</div>
-      `,
+      content:`<div style="width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;">🏠</div>`,
       offset: new window.AMap.Pixel(-7,-7),
       map:map
     })
@@ -581,6 +432,10 @@ function closeSiteModal(){showSiteModal.value=false}
 async function confirmSiteEval(){alert('保存完成')}
 
 onUnmounted(()=>{
+  if(currentInfoWin){
+    currentInfoWin.close()
+    currentInfoWin = null
+  }
   chartTotal?.dispose()
   chartType?.dispose()
   if (walking) walking.clear()
@@ -606,7 +461,22 @@ onUnmounted(()=>{
   color:#fff;
   overflow:hidden;
 }
-/* 顶部栏 */
+.toast-wrap{
+  position:fixed;
+  z-index:99999;
+  top:120px;
+  left:50%;
+  transform:translateX(-50%);
+}
+.toast-box{
+  padding:10px 22px;
+  border-radius:6px;
+  font-size:14px;
+}
+.toast-box.success{background:#198754;color:#fff;}
+.toast-box.error{background:#dc3545;color:#fff;}
+.toast-box.warning{background:#ffc107;color:#111;}
+
 .top-header{
   height:60px;
   background:#0f203d;
@@ -621,7 +491,6 @@ onUnmounted(()=>{
   align-items:center;
   gap:10px;
 }
-/* 顶部logo，和登录注册页同款柔和红十字 */
 .logo-icon{
   width: 24px;
   height: 24px;
@@ -675,13 +544,11 @@ onUnmounted(()=>{
 }
 .top-btn:hover{background:rgba(79,195,247,0.15);}
 .btn-logout:hover{background:rgba(255,87,87,0.2);}
-/* 主体三栏 */
 .main-container{
   flex:1;
   display:flex;
   min-height:0;
 }
-/* 左侧面板 */
 .aside-left{
   width:260px;
   background:#0d1c33;
@@ -760,13 +627,11 @@ onUnmounted(()=>{
   color:#8fa8c8;
   line-height:1.6;
 }
-/* 中间地图 */
 .map-wrap{
   flex:1;
   position:relative;
   min-width:0;
 }
-/* 路径规划悬浮面板 */
 .route-panel{
   position:absolute;
   left:16px;
@@ -825,7 +690,6 @@ onUnmounted(()=>{
 .route-btn{
   height:30px;
 }
-/* 右侧统计 */
 .aside-right{
   width:300px;
   background:#0d1c33;
@@ -855,7 +719,6 @@ onUnmounted(()=>{
   width:100%;
   height:240px;
 }
-/* 弹窗 */
 .modal{
   position:fixed;
   inset:0;
@@ -894,5 +757,97 @@ onUnmounted(()=>{
 .modal-buttons{
   display:flex;
   gap:8px;
+}
+</style>
+
+<style>
+/*高德InfoWindow弹窗全局样式，不能加scoped */
+.info-win-root{
+  position:relative;
+  min-width:345px;
+  max-width:375px;
+  background:#0d1c33;
+  border-radius:12px;
+  border:1px solid #2c5488;
+  padding:18px;
+  box-shadow:0 8px 26px rgba(0,0,0,0.70);
+}
+.win-close{
+  position:absolute;
+  top:10px;
+  right:14px;
+  font-size:22px;
+  color:#89a3c7;
+  cursor:pointer;
+  z-index:10;
+}
+.win-title{
+  color:#52b8f7;
+  margin:0 0 12px 0;
+  font-size:17px;
+  padding-right:24px;
+}
+.win-row{
+  margin:6px 0;
+  font-size:14px;
+  color:#b3e5fc;
+}
+.win-btn-group{
+  display:flex;
+  gap:10px;
+  margin:14px 0;
+}
+.win-btn-group button{
+  flex:1;
+  padding:8px 0;
+  background:rgba(30,136,229,0.18);
+  border:1px solid #2e5080;
+  color:#d0e4ff;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:14px;
+}
+.ta-comment{
+  width:100%;
+  background:#0a1728;
+  border:1px solid #27416b;
+  color:#d0e4ff;
+  border-radius:6px;
+  padding:9px;
+  min-height:70px;
+  resize:vertical;
+  box-sizing:border-box;
+  font-size:14px;
+}
+.win-submit-row{
+  display:flex;
+  gap:10px;
+  margin-top:10px;
+  align-items:center;
+}
+.sel-star{
+  width:110px;
+  height:34px;
+  background:#0a1728;
+  border:1px solid #27416b;
+  color:#d0e4ff;
+  border-radius:6px;
+  padding-left:8px;
+  font-size:14px;
+}
+.btn-submit{
+  flex:1;
+  height:34px;
+  background:rgba(82,184,247,0.20);
+  border:1px solid #52b8f7;
+  color:#c7e6ff;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:14px;
+}
+.comment-box{
+  margin-top:12px;
+  max-height:140px;
+  overflow-y:auto;
 }
 </style>
