@@ -1,10 +1,7 @@
 <template>
   <div class="app-wrap">
-    <!-- =========顶部科技感通栏：中间向下凸起，标题居中 ========= -->
     <header class="top-header">
-      <!-- 顶部压顶暗条 -->
       <div class="top-cap"></div>
-      <!-- 中间向下凸起装饰块 -->
       <div class="center-bulge">
         <div class="bulge-inner"></div>
         <div class="bulge-glow"></div>
@@ -33,23 +30,21 @@
         </template>
       </div>
     </header>
-    <!-- =========地图全屏容器 ========= -->
     <div class="map-full-container">
       <section class="map-wrap">
         <MapContainer @map-ready="onMapReady" />
-        <!-- 路径规划弹窗（悬浮左上角） -->
         <div class="route-panel" v-if="routePanelShow">
           <div class="route-title">
-            步行路径规划
+            路径规划
             <span class="close-btn" @click="closeRoutePanel">×</span>
           </div>
           <div class="route-form-item">
-            <label>起点（输入搜索 / 地图点击拾取）</label>
-            <input id="inputStart" v-model="route.startName" class="route-input" placeholder="输入地点，选择联想结果" />
+            <label>起点</label>
+            <input id="inputStart" v-model="route.startName" class="route-input" placeholder="输入地点" />
           </div>
           <div class="route-form-item">
-            <label>终点（输入搜索 / 地图点击拾取）</label>
-            <input id="inputEnd" v-model="route.endName" class="route-input" placeholder="输入地点，选择联想结果" />
+            <label>终点</label>
+            <input id="inputEnd" v-model="route.endName" class="route-input" placeholder="输入地点" />
           </div>
           <div class="route-tip">{{ routeClickTip }}</div>
           <div class="route-btn-row">
@@ -57,7 +52,6 @@
             <button class="btn-gray route-btn" @click="clearRouteDraw">清除路线</button>
           </div>
         </div>
-        <!-- 统计面板 悬浮右侧 -->
         <aside class="aside-right" v-show="statPanelVisible || sitePanelVisible">
           <div v-if="statPanelVisible" class="stat-card">
             <div class="card-title">医疗机构统计</div>
@@ -77,7 +71,6 @@
           <div class="toast-box" :class="toast.type">{{toast.msg}}</div>
         </div>
       </section>
-      <!-- =========底部横向工具栏========= -->
       <div class="bottom-tool-bar">
         <div class="tool-group">
           <select v-model="loadPointType" class="tool-select">
@@ -90,7 +83,7 @@
         </div>
         <div class="divider"></div>
         <div class="tool-group">
-          <button class="tool-btn" @click="openRoutePanel">🚶路径规划</button>
+          <button class="tool-btn" @click="openRoutePanel">🚗路径规划</button>
           <button class="tool-btn" @click="create15MinBuffer">🟦15分钟服务圈</button>
           <button class="tool-btn" @click="toggleStatPanel">📊系统统计</button>
           <button class="tool-btn" @click="toggleSitePanel">📍选址分析</button>
@@ -98,7 +91,6 @@
         </div>
       </div>
     </div>
-    <!-- 选址评估弹窗 -->
     <div class="modal" v-if="showSiteModal">
       <div class="modal-content">
         <h4>🏥 选址评估</h4>
@@ -120,6 +112,7 @@
     <AiChatDialog ref="aiChatRef" :visible="aiDialogVisible" @close="aiDialogVisible=false" />
   </div>
 </template>
+
 <script setup>
 import {ref,onUnmounted,nextTick,onMounted} from 'vue'
 import {useRouter} from 'vue-router'
@@ -131,18 +124,20 @@ import * as turf from '@turf/turf'
 import * as echarts from 'echarts'
 import {getUserInfo,clearStorage} from '../utils/storage'
 import {buildPointPopupHtml, bindPopupDomEvent} from '../utils/popupHelper'
+
 const router = useRouter()
 const aiDialogVisible = ref(false)
 const aiChatRef = ref(null)
 let map = null
 let chartTotal = null
 let chartType = null
-let walking = null
+let driving = null
 let autoStart = null
 let autoEnd = null
 let geocoder = null
 let placeSearch = null
 let routePluginsReady = false
+
 const userInfo = ref(getUserInfo())
 const loadPointType = ref('')
 const showSiteModal = ref(false)
@@ -158,7 +153,7 @@ const allMedicalPoints = ref([])
 let siteBufferPolygon = null
 const statPanelVisible = ref(false)
 const routePanelShow = ref(false)
-const routeClickTip = ref("🔵输入地点搜索，或点击地图拾取【起点】")
+const routeClickTip = ref("🔵选择地点，生成路径")
 const route = ref({
   startName:'',
   endName:'',
@@ -173,12 +168,28 @@ const toast = ref({
   msg:'',
   type:'success'
 })
+
+// 点位被点击，路径规划模式下直接填入起点终点
+function fillRouteByPoint(name,lng,lat){
+  const lnglatObj = new window.AMap.LngLat(lng,lat)
+  if(!route.value.startLngLat){
+    route.value.startName = name
+    route.value.startLngLat = lnglatObj
+    routeClickTip.value = `✅起点：${name}｜请再点击点位选择终点`
+  }else{
+    route.value.endName = name
+    route.value.endLngLat = lnglatObj
+    routeClickTip.value = `✅终点：${name}｜点击生成驾车路径`
+  }
+}
+
 function showToast(msg,type='success'){
   toast.value.msg = msg
   toast.value.type = type
   toast.value.show = true
   setTimeout(()=>{toast.value.show=false},2500)
 }
+
 onMounted(async ()=>{
   try{
     const resType = await request.get('/stat/countByType')
@@ -187,10 +198,12 @@ onMounted(async ()=>{
     console.error("读取医疗点位类型失败",e)
   }
 })
+
 const onMapReady = (m)=>{
   map = m
   map.on('click', globalMapClickHandler)
 }
+
 function globalMapClickHandler(e){
   if(isSiteSelectMode.value){
     tempSiteLng.value = e.lnglat.lng
@@ -204,6 +217,7 @@ function globalMapClickHandler(e){
     handleMapPick(e)
   }
 }
+
 function runSiteDensityAnalyze(lng, lat, radiusM){
   function getDistance(lng1, lat1, lng2, lat2) {
     const R = 6371000;
@@ -245,6 +259,7 @@ function runSiteDensityAnalyze(lng, lat, radiusM){
     insideList: insideList
   }
 }
+
 function toggleSitePanel(){
   if(allMedicalPoints.value.length === 0){
     showToast("请先加载医疗数据！","warning")
@@ -260,12 +275,14 @@ function toggleSitePanel(){
     clearSiteBufferDraw()
   }
 }
+
 function clearSiteBufferDraw(){
   if(siteBufferPolygon){
     siteBufferPolygon.setMap(null)
     siteBufferPolygon = null
   }
 }
+
 function handleSiteLocate({lng,lat,analyzeResult}){
   if(!map) return
   map.setCenter([lng,lat])
@@ -283,6 +300,7 @@ function handleSiteLocate({lng,lat,analyzeResult}){
     })
   }
 }
+
 async function confirmSiteEval(){
   if(!tempSiteLng.value || !tempSiteLat.value){
     showToast("请先在地图点击选点","warning")
@@ -326,12 +344,14 @@ async function confirmSiteEval(){
     showToast(e?.msg||"保存选址失败","error")
   }
 }
+
 function closeSiteModal(){
   showSiteModal.value=false
   evalNameInput.value = ''
   analyzeRadiusM.value = 1500
   siteTip.value = ''
 }
+
 async function toggleStatPanel(){
   statPanelVisible.value = !statPanelVisible.value
   sitePanelVisible.value = false
@@ -342,6 +362,7 @@ async function toggleStatPanel(){
     refreshStat()
   }
 }
+
 async function refreshStat(){
   if(chartTotal){ chartTotal.dispose(); chartType.dispose() }
   chartTotal = echarts.init(document.getElementById('chartBox'),'dark')
@@ -351,10 +372,12 @@ async function refreshStat(){
   chartTotal.setOption({tooltip:{},series:[{type:'gauge',data:[{value:resTotal.data.total,name:'机构总数'}]}]})
   chartType.setOption({tooltip:{trigger:'axis'},xAxis:{data:resType.data.map(i=>i.type)},yAxis:{},series:[{type:'bar',data:resType.data.map(i=>i.cnt)}]})
 }
+
+// ============ 驾车路径规划 ============
 function initRoutePlugins(){
   if(routePluginsReady) return Promise.resolve()
   return new Promise((resolve)=>{
-    window.AMap.plugin(['AMap.Geocoder','AMap.PlaceSearch','AMap.Walking'],()=>{
+    window.AMap.plugin(['AMap.Geocoder','AMap.PlaceSearch','AMap.Driving'],()=>{
       geocoder = new window.AMap.Geocoder({city:'上海市',radius:1000})
       placeSearch = new window.AMap.PlaceSearch({city:'上海市',citylimit:false,pageSize:1,extensions:'base'})
       routePluginsReady = true
@@ -362,6 +385,7 @@ function initRoutePlugins(){
     })
   })
 }
+
 function lnglatToName(lnglat){
   return new Promise((resolve)=>{
     geocoder.getAddress(lnglat,(status,result)=>{
@@ -371,6 +395,7 @@ function lnglatToName(lnglat){
     })
   })
 }
+
 function nameToLngLat(name){
   return new Promise((resolve)=>{
     placeSearch.search(name,(status,result)=>{
@@ -381,15 +406,17 @@ function nameToLngLat(name){
     })
   })
 }
+
 function afterPickResolved(which,name,ok){
   if(which==='start'){
     mapClickStatus.value = ok ?2:1
-    routeClickTip.value = ok ?`✅起点：${name}｜请再选择终点（输入或点地图拾取）`:`❌未解析到「${name}」的坐标，请换关键词或点击地图拾取`
+    routeClickTip.value = ok ?`✅起点：${name}｜请再选择终点`:`❌未解析到「${name}」的坐标，请换关键词`
   }else{
     mapClickStatus.value = ok ?1:2
-    routeClickTip.value = ok ?`✅终点：${name}｜点击「生成路径」，或继续点地图重选起点`:`❌未解析到「${name}」的坐标，请换关键词或点击地图拾取`
+    routeClickTip.value = ok ?`✅终点：${name}｜点击「生成驾车路径」`:`❌未解析到「${name}」的坐标，请换关键词`
   }
 }
+
 async function handleMapPick(e){
   const lnglat = e.lnglat
   if(!geocoder) await initRoutePlugins()
@@ -406,6 +433,7 @@ async function handleMapPick(e){
     afterPickResolved('end',label,true)
   }
 }
+
 async function openRoutePanel(){
   routePanelShow.value = true
   await nextTick()
@@ -413,7 +441,7 @@ async function openRoutePanel(){
   mapClickStatus.value =1
   isSiteSelectMode.value = false
   clearSiteBufferDraw()
-  routeClickTip.value = "🔵输入地点搜索，或点击地图拾取【起点】"
+  routeClickTip.value = "🔵选择地点，快速生成路径"
   route.value = {startName:'',endName:'',startLngLat:null,endLngLat:null}
   clearRouteDraw()
   autoStart = new window.AMap.AutoComplete({ input:'inputStart', city:'上海市', citylimit:false })
@@ -445,6 +473,7 @@ async function openRoutePanel(){
     }
   })
 }
+
 function closeRoutePanel(){
   routePanelShow.value = false
   mapClickStatus.value = 0
@@ -453,6 +482,7 @@ function closeRoutePanel(){
   document.querySelectorAll('.amap-sug-result').forEach(el=>el.remove())
   clearRouteDraw()
 }
+
 async function doRouteSearch(){
   if(!map) return showToast('地图尚未加载完成，请稍后再试','warning')
   await initRoutePlugins()
@@ -469,32 +499,51 @@ async function doRouteSearch(){
   const s = route.value.startLngLat
   const e2 = route.value.endLngLat
   if(!route.value.startName || !route.value.endName){
-    return showToast('请设置起点、终点：输入搜索地点，或者点击地图拾取坐标！','warning')
+    return showToast('请设置起点、终点！','warning')
   }
-  if(walking){ walking.clear(); walking = null }
-  walking = new window.AMap.Walking({map:map,hideMarkers:false,autoFitView:true})
-  const done = (status,result)=>{
-    if(status === 'complete'){
-      const r = result.routes?.[0]
-      if(r){
-        routeClickTip.value =`🚶 ${route.value.startName} → ${route.value.endName}｜全程 ${(r.distance/1000).toFixed(2)} 公里 · 步行约 ${Math.round(r.time/60)} 分钟`
-      }else routeClickTip.value = '✅路径已生成'
-    }else showToast('路径规划失败：' + (result?.info || status) + '，请更换点位重试','error')
+  if(driving) driving.clear()
+  driving = new window.AMap.Driving({ map:map, hideMarkers:false, autoFitView:true })
+  const searchCallback = (status,result)=>{
+    if(status !== 'complete'){
+      showToast(`路径规划失败：${result?.info||status}，更换点位重试`,"error")
+      return
+    }
+    const summary = result.routes?.[0]
+    if(summary){
+      const km = (summary.distance / 1000).toFixed(2)
+      const minute = Math.round(summary.time / 60)
+      routeClickTip.value =`🚗 ${route.value.startName} → ${route.value.endName}｜全程 ${km} 公里 · 驾车约 ${minute} 分钟`
+    }else{
+      routeClickTip.value = "✅驾车路线已生成"
+    }
   }
-  if(s && e2) walking.search(s,e2,done)
-  else walking.search([{ keyword: route.value.startName, city:'上海市' },{ keyword: route.value.endName, city:'上海市' }], done)
+  if(s && e2){
+    driving.search(s,e2,searchCallback)
+  }else{
+    driving.search([
+      { keyword: route.value.startName, city:'上海市' },
+      { keyword: route.value.endName, city:'上海市' }
+    ],searchCallback)
+  }
 }
+
 function clearRouteDraw(){
-  if(walking){ walking.clear(); walking = null }
+  if(driving){
+    driving.clear()
+    driving = null
+  }
   route.value = {startName:'',endName:'',startLngLat:null,endLngLat:null}
   mapClickStatus.value = 1
-  routeClickTip.value = "🔵输入地点搜索，或点击地图拾取【起点】"
+  routeClickTip.value = "🔵选择地点，快速生成路径"
 }
+
 const handleLogout = ()=>{
   clearStorage()
   userInfo.value=null
   router.push('/login')
 }
+
+// 加载医疗点位
 async function handleLoadPoint(){
   if(!loadPointType.value) return showToast("请选择点位类型","warning")
   if(loadPointType.value === 'community'){
@@ -511,15 +560,22 @@ async function handleLoadPoint(){
         offset: new window.AMap.Pixel(-9,-9),
         map:map
       })
-      const htmlContent = buildPointPopupHtml(item)
-      const infoWin = new window.AMap.InfoWindow({
-        content:htmlContent,
-        isCustom:true,
-        offset:new window.AMap.Pixel(0,-48),
-        closeWhenClickMap:true
-      })
+
       marker.on('click',()=>{
+        // 核心：驾车面板打开，直接填点，不弹详情弹窗
+        if(routePanelShow.value){
+          fillRouteByPoint(item.name, item.lng, item.lat)
+          return
+        }
+        // 关闭状态，正常打开收藏留言弹窗
         if(currentInfoWin) currentInfoWin.close()
+        let htmlPopup = buildPointPopupHtml(item)
+        const infoWin = new window.AMap.InfoWindow({
+          content:htmlPopup,
+          isCustom:true,
+          offset:new window.AMap.Pixel(0,-48),
+          closeWhenClickMap:true
+        })
         currentInfoWin = infoWin
         infoWin.open(map,marker.getPosition())
         bindPopupDomEvent(infoWin, item, showToast)
@@ -527,25 +583,53 @@ async function handleLoadPoint(){
     })
   }
 }
+
 function clearAllMarker(){
   if(!map) return
   map.clearMap()
-  if(walking){ walking.clear(); walking = null }
+  if(driving) driving.clear()
+  driving = null
   clearSiteBufferDraw()
   allMedicalPoints.value = []
 }
+
+// 加载居民区点位
 async function loadCommunityPoint(){
   const res = await request.get('/gisExtra/communityByRadius?lng=121.54&lat=31.22&radius=20000')
   res.data.forEach(item=>{
-    new window.AMap.Marker({
+    const marker = new window.AMap.Marker({
       position:[item.lng,item.lat],
       title:item.name,
       content:`<div style="width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;">🏠</div>`,
       offset: new window.AMap.Pixel(-7,-7),
       map:map
     })
+
+    marker.on('click',()=>{
+      if(routePanelShow.value){
+        fillRouteByPoint(item.name, item.lng, item.lat)
+        return
+      }
+      if(currentInfoWin) currentInfoWin.close()
+      let htmlPopup = `
+<div class="info-win-root">
+  <span class="win-close">×</span>
+  <h3 class="win-title">${item.name}</h3>
+  <div class="win-row">类型：居民区</div>
+  <div class="win-row">经度:${item.lng} 纬度:${item.lat}</div>
+</div>`
+      const infoWin = new window.AMap.InfoWindow({
+        content:htmlPopup,
+        isCustom:true,
+        offset:new window.AMap.Pixel(0,-48),
+        closeWhenClickMap:true
+      })
+      currentInfoWin = infoWin
+      infoWin.open(map,marker.getPosition())
+    })
   })
 }
+
 async function create15MinBuffer(){
   const res = await request.get('/medical/siteQuery')
   res.data.forEach(p=>{
@@ -559,6 +643,7 @@ async function create15MinBuffer(){
     })
   })
 }
+
 onUnmounted(()=>{
   clearSiteBufferDraw()
   if(map){
@@ -570,13 +655,14 @@ onUnmounted(()=>{
   }
   chartTotal?.dispose()
   chartType?.dispose()
-  if (walking) walking.clear()
-  walking = null
+  if(driving) driving.clear()
+  driving = null
   geocoder = null
   placeSearch = null
   document.querySelectorAll('.amap-sug-result').forEach(el=>el.remove())
 })
 </script>
+
 <style scoped>
 *{margin:0;padding:0;box-sizing:border-box;}
 .app-wrap{
@@ -617,7 +703,6 @@ onUnmounted(()=>{
   border-bottom:1px solid rgba(79,195,247,0.45);
   box-shadow:0 2px 0 rgba(0,0,0,0.55),0 10px 24px rgba(0,0,0,0.55),inset 0 1px 0 rgba(120,200,255,0.08);
 }
-/* 顶部压顶暗条 */
 .top-cap{
   position:absolute;
   left:0;
@@ -629,7 +714,6 @@ onUnmounted(()=>{
   border-bottom:1px solid rgba(79,195,247,0.22);
   box-shadow:inset 0 1px 0 rgba(255,255,255,0.04),inset 0 -8px 14px rgba(0,0,0,0.45);
 }
-/* 中间向下凸起面板 */
 .center-bulge{
   position:absolute;
   left:50%;
@@ -785,7 +869,6 @@ onUnmounted(()=>{
   border-color:rgba(255,120,120,0.45);
   box-shadow:0 0 12px rgba(255,87,87,0.25);
 }
-/* ========== 地图容器 ========== */
 .map-full-container{
   flex:1;
   position:relative;
@@ -796,7 +879,6 @@ onUnmounted(()=>{
   height:100%;
   position:relative;
 }
-/* ========== 底部深蓝模糊 ========== */
 .map-full-container::before{
   content:"";
   position:absolute;
@@ -813,7 +895,6 @@ onUnmounted(()=>{
       transparent 100%
     );
 }
-/* 底部细蓝光 */
 .map-full-container::after{
   content:"";
   position:absolute;
@@ -824,7 +905,6 @@ onUnmounted(()=>{
   background:linear-gradient(90deg,transparent 0%,rgba(79,195,247,0.25)20%,rgba(79,195,247,0.5)50%,rgba(79,195,247,0.25)80%,transparent 100%);
   box-shadow:0 0 10px rgba(79,195,247,0.45);
 }
-/* ========== 底部工具栏 ========== */
 .bottom-tool-bar{
   position:absolute;
   bottom:18px;
@@ -876,7 +956,6 @@ onUnmounted(()=>{
   border-color:rgba(79,195,247,0.55);
   box-shadow:0 0 14px rgba(79,195,247,0.3);
 }
-/* ========== 路径规划面板 ========== */
 .route-panel{
   position:absolute;
   left:16px;
@@ -951,7 +1030,6 @@ onUnmounted(()=>{
   color:#d0e4ff;
 }
 .btn-gray:hover{background:#35496b;}
-/* ========== 右侧统计/选址面板 ========== */
 .aside-right{
   position:absolute;
   top:16px;
@@ -982,7 +1060,6 @@ onUnmounted(()=>{
 }
 #chartBox{ width:100%; height:200px; }
 #chartType{ width:100%; height:240px; }
-/* ========== 弹窗 ========== */
 .modal{
   position:fixed;
   inset:0;
@@ -1037,6 +1114,7 @@ onUnmounted(()=>{
   gap:10px;
 }
 </style>
+
 <style>
 .info-win-root{
   position:relative;
@@ -1107,7 +1185,7 @@ onUnmounted(()=>{
   background:#0a1728;
   border:1px solid #27416b;
   color:#d0e4ff;
-  border-radius:6px;
+  border-radius:4px;
   padding-left:8px;
   font-size:14px;
 }
@@ -1119,7 +1197,6 @@ onUnmounted(()=>{
   color:#c7e6ff;
   border-radius:6px;
   cursor:pointer;
-  font-size:14px;
 }
 .comment-box{
   margin-top:12px;
