@@ -16,6 +16,7 @@ const collectRouter = require('./routes/collectApi')
 const gisExtraRouter = require('./routes/gisExtraApi')
 // =========新增AI路由导入==========
 const aiRouter = require('./routes/aiApi')
+const siteApi = require('./routes/siteApi')
 
 const app = express()
 const PORT = 3000
@@ -48,6 +49,7 @@ app.use('/api/collect', collectRouter)
 app.use('/api/gisExtra', gisExtraRouter)
 // =========新增挂载AI接口==========
 app.use('/api/ai', aiRouter)
+app.use('/api/site', siteApi)
 
 //全局错误捕获
 app.use((err, req, res, next) => {

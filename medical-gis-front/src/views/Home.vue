@@ -1,57 +1,43 @@
 <template>
   <div class="app-wrap">
-    <!-- ==========顶部通栏========== -->
+    <!-- =========顶部科技感通栏：中间向下凸起，标题居中 ========= -->
     <header class="top-header">
+      <!-- 顶部压顶暗条 -->
+      <div class="top-cap"></div>
+      <!-- 中间向下凸起装饰块 -->
+      <div class="center-bulge">
+        <div class="bulge-inner"></div>
+        <div class="bulge-glow"></div>
+      </div>
       <div class="header-left">
         <span class="logo-icon"></span>
-        <h1>浦东新区公共医疗资源服务平台</h1>
+        <button class="top-btn" @click="$router.push('/notice')">📢 系统公告</button>
+      </div>
+      <div class="header-center">
+        <div class="title-wrap">
+          <span class="title-glow"></span>
+          <h1>浦东新区公共医疗资源服务平台</h1>
+          <span class="title-line"></span>
+        </div>
       </div>
       <div class="header-right">
         <template v-if="!userInfo">
           <button class="top-btn" @click="$router.push('/login')">登录</button>
           <button class="top-btn" @click="$router.push('/register')">注册</button>
-          <button class="top-btn" @click="$router.push('/notice')">📢 系统公告</button>
         </template>
         <template v-else>
           <span class="user-text">{{userInfo.username}}</span>
           <span class="tag-admin" v-if="userInfo.role==='admin'">管理员</span>
           <button class="top-btn" @click="$router.push('/personal')">个人中心</button>
-          <button class="top-btn" @click="$router.push('/notice')">📢 系统公告</button>
           <button class="top-btn btn-logout" @click="handleLogout">退出</button>
         </template>
       </div>
     </header>
-    <div class="main-container">
-      <aside class="aside-left">
-        <div class="panel-block">
-          <div class="block-title">资源加载</div>
-          <div class="form-item">
-            <label>资源类型</label>
-            <select v-model="loadPointType">
-              <option value="">--请选择资源类型--</option>
-              <option v-for="t in medicalTypeList" :key="t.type" :value="t.type">{{ t.type }}</option>
-              <option value="community">居民区</option>
-            </select>
-          </div>
-          <div class="btn-row">
-            <button class="btn-primary" @click="handleLoadPoint">加载点位</button>
-            <button class="btn-gray" @click="clearAllMarker">清空图层</button>
-          </div>
-        </div>
-        <div class="panel-block">
-          <div class="block-title">功能分析</div>
-          <div class="menu-item" @click="openRoutePanel">路径规划</div>
-          <div class="menu-item" @click="create15MinBuffer">15分钟服务圈</div>
-          <div class="menu-item" @click="toggleStatPanel">系统统计</div>
-          <div class="menu-item" @click="aiDialogVisible=true">AI就医咨询</div>
-        </div>
-        <div class="panel-block tip-block">
-          <div class="block-title">操作提示</div>
-          <p class="tip-desc">进入系统后地图默认空白，请先在上方选择点位类型并点击加载点位。</p>
-        </div>
-      </aside>
+    <!-- =========地图全屏容器 ========= -->
+    <div class="map-full-container">
       <section class="map-wrap">
         <MapContainer @map-ready="onMapReady" />
+        <!-- 路径规划弹窗（悬浮左上角） -->
         <div class="route-panel" v-if="routePanelShow">
           <div class="route-title">
             步行路径规划
@@ -71,27 +57,60 @@
             <button class="btn-gray route-btn" @click="clearRouteDraw">清除路线</button>
           </div>
         </div>
-        <!-- 轻提示，小方块自动消失，不alert弹窗 -->
+        <!-- 统计面板 悬浮右侧 -->
+        <aside class="aside-right" v-show="statPanelVisible || sitePanelVisible">
+          <div v-if="statPanelVisible" class="stat-card">
+            <div class="card-title">医疗机构统计</div>
+            <div id="chartBox"></div>
+          </div>
+          <div v-if="statPanelVisible" class="stat-card">
+            <div class="card-title">点位类型统计</div>
+            <div id="chartType"></div>
+          </div>
+          <SiteSelectionPanel
+            v-if="sitePanelVisible"
+            :trigger-refresh="siteNeedRefresh"
+            @locate-map="handleSiteLocate"
+          />
+        </aside>
         <div class="toast-wrap" v-if="toast.show">
           <div class="toast-box" :class="toast.type">{{toast.msg}}</div>
         </div>
       </section>
-      <aside class="aside-right" v-show="statPanelVisible">
-        <div class="stat-card">
-          <div class="card-title">医疗机构统计</div>
-          <div id="chartBox"></div>
+      <!-- =========底部横向工具栏========= -->
+      <div class="bottom-tool-bar">
+        <div class="tool-group">
+          <select v-model="loadPointType" class="tool-select">
+            <option value="">--资源类型--</option>
+            <option v-for="t in medicalTypeList" :key="t.type" :value="t.type">{{ t.type }}</option>
+            <option value="community">居民区</option>
+          </select>
+          <button class="tool-btn" @click="handleLoadPoint">加载点位</button>
+          <button class="tool-btn" @click="clearAllMarker">清空图层</button>
         </div>
-        <div class="stat-card">
-          <div class="card-title">点位类型统计</div>
-          <div id="chartType"></div>
+        <div class="divider"></div>
+        <div class="tool-group">
+          <button class="tool-btn" @click="openRoutePanel">🚶路径规划</button>
+          <button class="tool-btn" @click="create15MinBuffer">🟦15分钟服务圈</button>
+          <button class="tool-btn" @click="toggleStatPanel">📊系统统计</button>
+          <button class="tool-btn" @click="toggleSitePanel">📍选址分析</button>
+          <button class="tool-btn" @click="aiDialogVisible=true">🤖AI就医咨询</button>
         </div>
-      </aside>
+      </div>
     </div>
+    <!-- 选址评估弹窗 -->
     <div class="modal" v-if="showSiteModal">
       <div class="modal-content">
-        <h4>选址分析</h4>
-        <p>{{siteTip}}</p>
-        <input v-model="evalNameInput" placeholder="填写评估名称" />
+        <h4>🏥 选址评估</h4>
+        <div class="form-item-modal">
+          <label>分析半径(米，500‑5000)</label>
+          <input v-model.number="analyzeRadiusM" type="number" min="500" max="5000" placeholder="请填写半径"/>
+        </div>
+        <div class="form-item-modal">
+          <label>评估名称</label>
+          <input v-model="evalNameInput" placeholder="填写评估名称"/>
+        </div>
+        <div v-if="siteTip" class="site-tip-text">{{siteTip}}</div>
         <div class="modal-buttons">
           <button class="btn-primary" @click="confirmSiteEval">确认保存</button>
           <button class="btn-gray" @click="closeSiteModal">关闭</button>
@@ -101,19 +120,17 @@
     <AiChatDialog ref="aiChatRef" :visible="aiDialogVisible" @close="aiDialogVisible=false" />
   </div>
 </template>
-
 <script setup>
 import {ref,onUnmounted,nextTick,onMounted} from 'vue'
 import {useRouter} from 'vue-router'
 import MapContainer from '../components/MapContainer.vue'
 import AiChatDialog from '../components/AiChatDialog.vue'
+import SiteSelectionPanel from '../components/SiteSelectionPanel.vue'
 import request from '../api/request'
 import * as turf from '@turf/turf'
 import * as echarts from 'echarts'
 import {getUserInfo,clearStorage} from '../utils/storage'
-// 引入抽离的弹窗工具
 import {buildPointPopupHtml, bindPopupDomEvent} from '../utils/popupHelper'
-
 const router = useRouter()
 const aiDialogVisible = ref(false)
 const aiChatRef = ref(null)
@@ -123,15 +140,22 @@ let chartType = null
 let walking = null
 let autoStart = null
 let autoEnd = null
-let isMapPickBind = false
 let geocoder = null
 let placeSearch = null
 let routePluginsReady = false
 const userInfo = ref(getUserInfo())
 const loadPointType = ref('')
 const showSiteModal = ref(false)
-const siteTip = ref('点击地图获取选址坐标')
+const siteTip = ref('')
 const evalNameInput = ref('')
+const analyzeRadiusM = ref()
+const tempSiteLng = ref(null)
+const tempSiteLat = ref(null)
+const sitePanelVisible = ref(false)
+const siteNeedRefresh = ref(false)
+const isSiteSelectMode = ref(false)
+const allMedicalPoints = ref([])
+let siteBufferPolygon = null
 const statPanelVisible = ref(false)
 const routePanelShow = ref(false)
 const routeClickTip = ref("🔵输入地点搜索，或点击地图拾取【起点】")
@@ -143,11 +167,7 @@ const route = ref({
 })
 const mapClickStatus = ref(0)
 const medicalTypeList = ref([])
-let tempSiteLng=null
-let tempSiteLat=null
 let currentInfoWin = null
-
-//轻提示
 const toast = ref({
   show:false,
   msg:'',
@@ -159,20 +179,178 @@ function showToast(msg,type='success'){
   toast.value.show = true
   setTimeout(()=>{toast.value.show=false},2500)
 }
-
 onMounted(async ()=>{
   try{
-    const res = await request.get('/stat/countByType')
-    medicalTypeList.value = res.data
+    const resType = await request.get('/stat/countByType')
+    medicalTypeList.value = resType.data
   }catch(e){
     console.error("读取医疗点位类型失败",e)
   }
 })
-
 const onMapReady = (m)=>{
   map = m
+  map.on('click', globalMapClickHandler)
 }
-
+function globalMapClickHandler(e){
+  if(isSiteSelectMode.value){
+    tempSiteLng.value = e.lnglat.lng
+    tempSiteLat.value = e.lnglat.lat
+    showSiteModal.value = true
+    isSiteSelectMode.value = false
+    siteTip.value = "⚠️请填写半径与评估名称后点确认保存"
+    return
+  }
+  if(mapClickStatus.value>0){
+    handleMapPick(e)
+  }
+}
+function runSiteDensityAnalyze(lng, lat, radiusM){
+  function getDistance(lng1, lat1, lng2, lat2) {
+    const R = 6371000;
+    const rad = Math.PI / 180;
+    const latRad1 = lat1 * rad;
+    const latRad2 = lat2 * rad;
+    const deltaLat = (lat2 - lat1) * rad;
+    const deltaLng = (lng2 - lng1) * rad;
+    const a = Math.sin(deltaLat / 2)**2 + Math.cos(latRad1)*Math.cos(latRad2)*Math.sin(deltaLng / 2)**2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+  const insideList = []
+  allMedicalPoints.value.forEach(ptObj=>{
+    const pLng = ptObj.geometry.coordinates[0]
+    const pLat = ptObj.geometry.coordinates[1]
+    const dist = getDistance(lng, lat, pLng, pLat)
+    if(dist <= radiusM){
+      insideList.push(ptObj.properties)
+    }
+  })
+  const count = insideList.length
+  let level, suggestion
+  if(count <=2){
+    level = "资源稀缺"
+    suggestion = "周边医疗机构数量较少，适合新建医疗点"
+  }else if(count <=6){
+    level = "资源适中"
+    suggestion = "周边已有一定医疗资源，可以酌情规划建设"
+  }else{
+    level = "高度密集"
+    suggestion = "周边医疗机构已经很多，不建议继续新增"
+  }
+  return {
+    radius: radiusM,
+    radiusKm: radiusM / 1000,
+    aroundCount: count,
+    densityLevel: level,
+    suggestion: suggestion,
+    insideList: insideList
+  }
+}
+function toggleSitePanel(){
+  if(allMedicalPoints.value.length === 0){
+    showToast("请先加载医疗数据！","warning")
+    return
+  }
+  sitePanelVisible.value = !sitePanelVisible.value
+  statPanelVisible.value = false
+  if(sitePanelVisible.value){
+    isSiteSelectMode.value = true
+    siteTip.value = "🟢请在地图上点击，选取候选选址点"
+  }else{
+    isSiteSelectMode.value = false
+    clearSiteBufferDraw()
+  }
+}
+function clearSiteBufferDraw(){
+  if(siteBufferPolygon){
+    siteBufferPolygon.setMap(null)
+    siteBufferPolygon = null
+  }
+}
+function handleSiteLocate({lng,lat,analyzeResult}){
+  if(!map) return
+  map.setCenter([lng,lat])
+  map.setZoom(14)
+  clearSiteBufferDraw()
+  if(analyzeResult && analyzeResult.radiusKm){
+    const pt = turf.point([lng, lat])
+    const buf = turf.buffer(pt, analyzeResult.radiusKm, {units:'kilometers'})
+    siteBufferPolygon = new window.AMap.Polygon({
+      path:buf.geometry.coordinates[0],
+      fillColor:'rgba(100,200,255,0.18)',
+      strokeColor:'#4fc3f7',
+      strokeWeight:2,
+      map:map
+    })
+  }
+}
+async function confirmSiteEval(){
+  if(!tempSiteLng.value || !tempSiteLat.value){
+    showToast("请先在地图点击选点","warning")
+    return
+  }
+  if(!evalNameInput.value.trim()){
+    showToast("请填写评估名称","warning")
+    return
+  }
+  if(!userInfo.value?.id){
+    showToast("请登录后操作","warning")
+    return
+  }
+  if(!analyzeRadiusM.value || analyzeRadiusM.value<500 || analyzeRadiusM.value>5000){
+    showToast("分析半径范围500‑5000米","warning")
+    return
+  }
+  const analyzeResult = runSiteDensityAnalyze(tempSiteLng.value, tempSiteLat.value, analyzeRadiusM.value)
+  siteTip.value = `🔍分析半径：${analyzeResult.radius}米\n周边医疗点位：${analyzeResult.aroundCount}个\n【${analyzeResult.densityLevel}】${analyzeResult.suggestion}`
+  try{
+    const res = await request.post('/site/add',{
+      userId: userInfo.value.id,
+      evalName:evalNameInput.value,
+      lng:tempSiteLng.value,
+      lat:tempSiteLat.value,
+      resultJson: JSON.stringify(analyzeResult)
+    })
+    console.log('选址接口返回',res)
+    showToast("选址评估保存成功！","success")
+    siteNeedRefresh.value = true
+    evalNameInput.value = ''
+    analyzeRadiusM.value = ' '
+    tempSiteLng.value = null
+    tempSiteLat.value = null
+    showSiteModal.value = false
+    setTimeout(()=>{
+      siteNeedRefresh.value = false
+    },100)
+  }catch(e){
+    console.error(e)
+    showToast(e?.msg||"保存选址失败","error")
+  }
+}
+function closeSiteModal(){
+  showSiteModal.value=false
+  evalNameInput.value = ''
+  analyzeRadiusM.value = 1500
+  siteTip.value = ''
+}
+async function toggleStatPanel(){
+  statPanelVisible.value = !statPanelVisible.value
+  sitePanelVisible.value = false
+  isSiteSelectMode.value = false
+  clearSiteBufferDraw()
+  if(statPanelVisible.value){
+    await nextTick()
+    refreshStat()
+  }
+}
+async function refreshStat(){
+  if(chartTotal){ chartTotal.dispose(); chartType.dispose() }
+  chartTotal = echarts.init(document.getElementById('chartBox'),'dark')
+  chartType = echarts.init(document.getElementById('chartType'),'dark')
+  const resTotal = await request.get('/stat/countAll')
+  const resType = await request.get('/stat/countByType')
+  chartTotal.setOption({tooltip:{},series:[{type:'gauge',data:[{value:resTotal.data.total,name:'机构总数'}]}]})
+  chartType.setOption({tooltip:{trigger:'axis'},xAxis:{data:resType.data.map(i=>i.type)},yAxis:{},series:[{type:'bar',data:resType.data.map(i=>i.cnt)}]})
+}
 function initRoutePlugins(){
   if(routePluginsReady) return Promise.resolve()
   return new Promise((resolve)=>{
@@ -184,7 +362,6 @@ function initRoutePlugins(){
     })
   })
 }
-
 function lnglatToName(lnglat){
   return new Promise((resolve)=>{
     geocoder.getAddress(lnglat,(status,result)=>{
@@ -194,7 +371,6 @@ function lnglatToName(lnglat){
     })
   })
 }
-
 function nameToLngLat(name){
   return new Promise((resolve)=>{
     placeSearch.search(name,(status,result)=>{
@@ -205,7 +381,6 @@ function nameToLngLat(name){
     })
   })
 }
-
 function afterPickResolved(which,name,ok){
   if(which==='start'){
     mapClickStatus.value = ok ?2:1
@@ -215,9 +390,7 @@ function afterPickResolved(which,name,ok){
     routeClickTip.value = ok ?`✅终点：${name}｜点击「生成路径」，或继续点地图重选起点`:`❌未解析到「${name}」的坐标，请换关键词或点击地图拾取`
   }
 }
-
 async function handleMapPick(e){
-  if(!mapClickStatus.value) return
   const lnglat = e.lnglat
   if(!geocoder) await initRoutePlugins()
   routeClickTip.value = '🔍正在解析该点地址…'
@@ -233,12 +406,13 @@ async function handleMapPick(e){
     afterPickResolved('end',label,true)
   }
 }
-
 async function openRoutePanel(){
   routePanelShow.value = true
   await nextTick()
   await initRoutePlugins()
   mapClickStatus.value =1
+  isSiteSelectMode.value = false
+  clearSiteBufferDraw()
   routeClickTip.value = "🔵输入地点搜索，或点击地图拾取【起点】"
   route.value = {startName:'',endName:'',startLngLat:null,endLngLat:null}
   clearRouteDraw()
@@ -270,27 +444,17 @@ async function openRoutePanel(){
       afterPickResolved('end',name,!!r)
     }
   })
-  if(map && !isMapPickBind){
-    map.on('click', handleMapPick)
-    isMapPickBind = true
-  }
 }
-
 function closeRoutePanel(){
   routePanelShow.value = false
   mapClickStatus.value = 0
   autoStart = null
   autoEnd = null
   document.querySelectorAll('.amap-sug-result').forEach(el=>el.remove())
-  if(map && isMapPickBind){
-    map.off('click', handleMapPick)
-    isMapPickBind = false
-  }
   clearRouteDraw()
 }
-
 async function doRouteSearch(){
-  if(!map) return alert('地图尚未加载完成，请稍后再试')
+  if(!map) return showToast('地图尚未加载完成，请稍后再试','warning')
   await initRoutePlugins()
   if(!route.value.startLngLat && route.value.startName){
     routeClickTip.value = '🔍正在解析起点坐标…'
@@ -305,7 +469,7 @@ async function doRouteSearch(){
   const s = route.value.startLngLat
   const e2 = route.value.endLngLat
   if(!route.value.startName || !route.value.endName){
-    return alert('请设置起点、终点：输入搜索地点，或者点击地图拾取坐标！')
+    return showToast('请设置起点、终点：输入搜索地点，或者点击地图拾取坐标！','warning')
   }
   if(walking){ walking.clear(); walking = null }
   walking = new window.AMap.Walking({map:map,hideMarkers:false,autoFitView:true})
@@ -315,83 +479,61 @@ async function doRouteSearch(){
       if(r){
         routeClickTip.value =`🚶 ${route.value.startName} → ${route.value.endName}｜全程 ${(r.distance/1000).toFixed(2)} 公里 · 步行约 ${Math.round(r.time/60)} 分钟`
       }else routeClickTip.value = '✅路径已生成'
-    }else alert('路径规划失败：' + (result?.info || status) + '，请更换点位重试')
+    }else showToast('路径规划失败：' + (result?.info || status) + '，请更换点位重试','error')
   }
   if(s && e2) walking.search(s,e2,done)
   else walking.search([{ keyword: route.value.startName, city:'上海市' },{ keyword: route.value.endName, city:'上海市' }], done)
 }
-
 function clearRouteDraw(){
   if(walking){ walking.clear(); walking = null }
   route.value = {startName:'',endName:'',startLngLat:null,endLngLat:null}
   mapClickStatus.value = 1
   routeClickTip.value = "🔵输入地点搜索，或点击地图拾取【起点】"
 }
-
 const handleLogout = ()=>{
   clearStorage()
   userInfo.value=null
   router.push('/login')
 }
-
-async function toggleStatPanel(){
-  statPanelVisible.value = !statPanelVisible.value
-  if(statPanelVisible.value){
-    await nextTick()
-    refreshStat()
-  }
-}
-
-async function refreshStat(){
-  if(chartTotal){ chartTotal.dispose(); chartType.dispose() }
-  chartTotal = echarts.init(document.getElementById('chartBox'),'dark')
-  chartType = echarts.init(document.getElementById('chartType'),'dark')
-  const resTotal = await request.get('/stat/countAll')
-  const resType = await request.get('/stat/countByType')
-  chartTotal.setOption({tooltip:{},series:[{type:'gauge',data:[{value:resTotal.data.total,name:'机构总数'}]}]})
-  chartType.setOption({tooltip:{trigger:'axis'},xAxis:{data:resType.data.map(i=>i.type)},yAxis:{},series:[{type:'bar',data:resType.data.map(i=>i.cnt)}]})
-}
-
 async function handleLoadPoint(){
   if(!loadPointType.value) return showToast("请选择点位类型","warning")
-  if(loadPointType.value === 'community') await loadCommunityPoint()
-  else await loadMedicalPoint(loadPointType.value)
+  if(loadPointType.value === 'community'){
+    await loadCommunityPoint()
+  }else{
+    const url = '/medical/point?type='+encodeURIComponent(loadPointType.value)
+    const res = await request.get(url)
+    allMedicalPoints.value = res.data.map(p=>turf.point([p.lng,p.lat],{name:p.name,type:p.type}))
+    res.data.forEach(item=>{
+      const marker = new window.AMap.Marker({
+        position:[item.lng,item.lat],
+        title:item.name,
+        content:`<div style="width:16px;height:16px;border-radius:50%;background:#d82626;display:flex;align-items:center;justify-content:center;color:#ffffff;font-weight:bold;font-size:14px;line-height:1;">+</div>`,
+        offset: new window.AMap.Pixel(-9,-9),
+        map:map
+      })
+      const htmlContent = buildPointPopupHtml(item)
+      const infoWin = new window.AMap.InfoWindow({
+        content:htmlContent,
+        isCustom:true,
+        offset:new window.AMap.Pixel(0,-48),
+        closeWhenClickMap:true
+      })
+      marker.on('click',()=>{
+        if(currentInfoWin) currentInfoWin.close()
+        currentInfoWin = infoWin
+        infoWin.open(map,marker.getPosition())
+        bindPopupDomEvent(infoWin, item, showToast)
+      })
+    })
+  }
 }
-
 function clearAllMarker(){
   if(!map) return
   map.clearMap()
   if(walking){ walking.clear(); walking = null }
+  clearSiteBufferDraw()
+  allMedicalPoints.value = []
 }
-
-async function loadMedicalPoint(type){
-  let url = '/medical/point'
-  if(type) url +=`?type=${encodeURIComponent(type)}`
-  const res = await request.get(url)
-  res.data.forEach(item=>{
-    const marker = new window.AMap.Marker({
-      position:[item.lng,item.lat],
-      title:item.name,
-      content:`<div style="width:16px;height:16px;border-radius:50%;background:#d82626;display:flex;align-items:center;justify-content:center;color:#ffffff;font-weight:bold;font-size:14px;line-height:1;">+</div>`,
-      offset: new window.AMap.Pixel(-9,-9),
-      map:map
-    })
-    const htmlContent = buildPointPopupHtml(item)
-    const infoWin = new window.AMap.InfoWindow({
-      content:htmlContent,
-      isCustom:true,
-      offset:new window.AMap.Pixel(0,-48),
-      closeWhenClickMap:true
-    })
-    marker.on('click',()=>{
-      if(currentInfoWin) currentInfoWin.close()
-      currentInfoWin = infoWin
-      infoWin.open(map,marker.getPosition())
-      bindPopupDomEvent(infoWin, item, showToast)
-    })
-  })
-}
-
 async function loadCommunityPoint(){
   const res = await request.get('/gisExtra/communityByRadius?lng=121.54&lat=31.22&radius=20000')
   res.data.forEach(item=>{
@@ -404,7 +546,6 @@ async function loadCommunityPoint(){
     })
   })
 }
-
 async function create15MinBuffer(){
   const res = await request.get('/medical/siteQuery')
   res.data.forEach(p=>{
@@ -418,20 +559,11 @@ async function create15MinBuffer(){
     })
   })
 }
-
-function openSiteDialog(){
-  map.once('click',e=>{
-    tempSiteLng = e.lnglat.lng
-    tempSiteLat = e.lnglat.lat
-    new window.AMap.Marker({position:[tempSiteLng,tempSiteLat],map})
-    showSiteModal.value=true
-  })
-}
-
-function closeSiteModal(){showSiteModal.value=false}
-async function confirmSiteEval(){alert('保存完成')}
-
 onUnmounted(()=>{
+  clearSiteBufferDraw()
+  if(map){
+    map.off('click', globalMapClickHandler)
+  }
   if(currentInfoWin){
     currentInfoWin.close()
     currentInfoWin = null
@@ -442,14 +574,9 @@ onUnmounted(()=>{
   walking = null
   geocoder = null
   placeSearch = null
-  if(map && isMapPickBind){
-    map.off('click', handleMapPick)
-    isMapPickBind = false
-  }
   document.querySelectorAll('.amap-sug-result').forEach(el=>el.remove())
 })
 </script>
-
 <style scoped>
 *{margin:0;padding:0;box-sizing:border-box;}
 .app-wrap{
@@ -464,7 +591,7 @@ onUnmounted(()=>{
 .toast-wrap{
   position:fixed;
   z-index:99999;
-  top:120px;
+  top:90px;
   left:50%;
   transform:translateX(-50%);
 }
@@ -476,169 +603,287 @@ onUnmounted(()=>{
 .toast-box.success{background:#198754;color:#fff;}
 .toast-box.error{background:#dc3545;color:#fff;}
 .toast-box.warning{background:#ffc107;color:#111;}
-
+/* ========= 顶部栏：中间向下凸起 ========= */
 .top-header{
-  height:60px;
-  background:#0f203d;
-  border-bottom:1px solid #27416b;
+  height:84px;
+  position:relative;
   display:flex;
   justify-content:space-between;
   align-items:center;
-  padding:0 24px;
+  padding:0 32px;
+  flex-shrink:0;
+  z-index:100;
+  background:linear-gradient(180deg,rgba(7,18,40,0.98) 0%,rgba(11,30,64,0.96) 46%,rgba(14,40,90,0.94)100%);
+  border-bottom:1px solid rgba(79,195,247,0.45);
+  box-shadow:0 2px 0 rgba(0,0,0,0.55),0 10px 24px rgba(0,0,0,0.55),inset 0 1px 0 rgba(120,200,255,0.08);
 }
-.header-left{
+/* 顶部压顶暗条 */
+.top-cap{
+  position:absolute;
+  left:0;
+  right:0;
+  top:0;
+  height:26px;
+  z-index:2;
+  background:linear-gradient(180deg,rgba(5,12,28,0.99),rgba(9,22,48,0.96));
+  border-bottom:1px solid rgba(79,195,247,0.22);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.04),inset 0 -8px 14px rgba(0,0,0,0.45);
+}
+/* 中间向下凸起面板 */
+.center-bulge{
+  position:absolute;
+  left:50%;
+  top:24px;
+  transform:translateX(-50%);
+  width:54%;
+  height:60px;
+  z-index:3;
+  background:linear-gradient(180deg,rgba(12,34,72,0.97)0%,rgba(18,56,124,0.94)45%,rgba(10,28,60,0.96)100%);
+  border:1px solid rgba(79,195,247,0.35);
+  border-top:1px solid rgba(79,195,247,0.55);
+  border-radius:18px 18px 26px 26px;
+  box-shadow:0 14px 28px rgba(0,0,0,0.55),0 0 0 1px rgba(0,0,0,0.35),inset 0 1px 0 rgba(255,255,255,0.08),inset 0 -10px 18px rgba(0,0,0,0.35);
+  clip-path:polygon(8% 0,92% 0,100% 0,100% 70%,94% 100%,6% 100%,0 70%,0 0);
+}
+.bulge-inner{
+  position:absolute;
+  left:6%;
+  right:6%;
+  top:10px;
+  height:18px;
+  border-radius:50%;
+  background:linear-gradient(180deg,rgba(79,195,247,0.18)0%,rgba(79,195,247,0.04)100%);
+  border:1px solid rgba(79,195,247,0.25);
+  border-bottom:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.06),0 0 12px rgba(79,195,247,0.12);
+}
+.bulge-glow{
+  position:absolute;
+  left:18%;
+  right:18%;
+  bottom:10px;
+  height:1px;
+  background:linear-gradient(90deg,transparent 0%,rgba(79,195,247,0.45)20%,rgba(79,195,247,0.95)50%,rgba(79,195,247,0.45)80%,transparent 100%);
+  box-shadow:0 0 10px rgba(79,195,247,0.55),0 0 24px rgba(79,195,247,0.25);
+}
+.header-left,.header-right{
+  position:relative;
+  z-index:4;
   display:flex;
   align-items:center;
-  gap:10px;
-}
-.logo-icon{
-  width: 24px;
-  height: 24px;
-  background: rgba(229, 57, 53, 0.12);
-  border: 1px solid rgba(229, 57, 53, 0.35);
-  border-radius: 50%;
-  position: relative;
-}
-.logo-icon::before,
-.logo-icon::after {
-  content: "";
-  position: absolute;
-  background: #e53935;
-  box-shadow: 0 0 8px rgba(229, 57, 53, 0.55);
-  border-radius: 2px;
-}
-.logo-icon::before {
-  width: 5px;
-  height: 16px;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-.logo-icon::after {
-  width: 16px;
-  height: 5px;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-.header-left h1{
-  font-size:20px;
-  color:#e0edff;
+  gap:12px;
+  flex:1;
 }
 .header-right{
+  justify-content:flex-end;
+}
+.header-center{
+  position:relative;
+  z-index:5;
+  flex:2;
   display:flex;
-  gap:12px;
+  justify-content:center;
+  align-items:flex-start;
+  padding-top:4px;
+}
+.title-wrap{
+  display:flex;
   align-items:center;
+  gap:14px;
+  padding:6px 18px;
+}
+.title-glow{
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#4fc3f7;
+  position:relative;
+  box-shadow:0 0 10px #4fc3f7,0 0 22px rgba(79,195,247,0.75);
+}
+.title-glow::after{
+  content:"";
+  position:absolute;
+  inset:-6px;
+  border-radius:50%;
+  border:1px solid rgba(79,195,247,0.45);
+  animation:titlePulse 2.4s infinite ease-in-out;
+}
+@keyframes titlePulse{
+  0%{ transform:scale(0.85); opacity:0.8; }
+  50%{ transform:scale(1.2); opacity:0.35; }
+  100%{ transform:scale(0.85); opacity:0.8; }
+}
+.header-center h1{
+  font-size:19px;
+  font-weight:600;
+  letter-spacing:1.4px;
+  color:#eaf6ff;
+  background:linear-gradient(180deg,#ffffff 0%,#9fd8ff 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+  text-shadow:0 0 18px rgba(79,195,247,0.35);
+  margin:0;
+}
+.title-line{
+  width:44px;
+  height:1px;
+  background:linear-gradient(90deg,transparent,#4fc3f7,transparent);
+}
+.logo-icon{
+  width:26px;
+  height:26px;
+  background:rgba(229,57,53,0.14);
+  border:1px solid rgba(229,57,53,0.45);
+  border-radius:50%;
+  position:relative;
+  box-shadow:0 0 12px rgba(229,57,53,0.35);
+}
+.logo-icon::before,.logo-icon::after{
+  content:"";
+  position:absolute;
+  background:#ff5f5f;
+  box-shadow:0 0 10px rgba(255,95,95,0.6);
+  border-radius:2px;
+}
+.logo-icon::before{
+  width:5px;height:14px;
+  left:50%;top:50%;
+  transform:translate(-50%,-50%);
+}
+.logo-icon::after{
+  width:14px;height:5px;
+  left:50%;top:50%;
+  transform:translate(-50%,-50%);
 }
 .user-text{color:#b8d4ff;}
 .tag-admin{
-  padding:2px 8px;background:rgba(79,195,247,0.2);color:#4fc3f7;border-radius:3px;font-size:12px;
+  padding:2px 8px;
+  background:rgba(79,195,247,0.18);
+  color:#4fc3f7;
+  border:1px solid rgba(79,195,247,0.4);
+  border-radius:3px;
+  font-size:12px;
 }
 .top-btn{
   padding:6px 14px;
-  background:rgba(255,255,255,0.07);
-  border:1px solid rgba(255,255,255,0.12);
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(120,200,255,0.18);
   color:#d0e4ff;
   border-radius:4px;
-  cursor:pointer;
-}
-.top-btn:hover{background:rgba(79,195,247,0.15);}
-.btn-logout:hover{background:rgba(255,87,87,0.2);}
-.main-container{
-  flex:1;
-  display:flex;
-  min-height:0;
-}
-.aside-left{
-  width:260px;
-  background:#0d1c33;
-  border-right:1px solid #27416b;
-  padding:14px;
-  overflow-y:auto;
-}
-.panel-block{
-  background:rgba(255,255,255,0.03);
-  border:1px solid #27416b;
-  border-radius:6px;
-  padding:12px;
-  margin-bottom:14px;
-}
-.block-title{
-  font-size:14px;
-  color:#4fc3f7;
-  border-left:3px solid #4fc3f7;
-  padding-left:8px;
-  margin-bottom:10px;
-}
-.form-item{
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  margin-bottom:10px;
-}
-.form-item label{
-  font-size:12px;
-  color:#9db8dd;
-}
-.form-item select{
-  height:30px;
-  background:#0a1728;
-  border:1px solid #27416b;
-  color:#d0e4ff;
-  border-radius:4px;
-  padding:0 6px;
-}
-.btn-row{
-  display:flex;
-  gap:8px;
-}
-.btn-primary,.btn-gray{
-  flex:1;
-  height:30px;
-  border-radius:4px;
-  border:none;
   cursor:pointer;
   font-size:13px;
+  transition:all .2s ease;
 }
-.btn-primary{
-  background:#1e88e5;
-  color:#fff;
+.top-btn:hover{
+  background:rgba(79,195,247,0.18);
+  border-color:rgba(79,195,247,0.5);
+  box-shadow:0 0 12px rgba(79,195,247,0.25);
 }
-.btn-primary:hover{background:#2196f3;}
-.btn-gray{
-  background:#2a3d5c;
-  color:#d0e4ff;
+.btn-logout:hover{
+  background:rgba(255,87,87,0.22);
+  border-color:rgba(255,120,120,0.45);
+  box-shadow:0 0 12px rgba(255,87,87,0.25);
 }
-.btn-gray:hover{background:#35496b;}
-.menu-item{
-  padding:8px 10px;
-  margin-bottom:6px;
-  background:rgba(79,195,247,0.08);
-  border:1px solid #27416b;
-  border-radius:4px;
-  font-size:13px;
-  cursor:pointer;
-}
-.menu-item:hover{
-  background:rgba(79,195,247,0.2);
-}
-.tip-block .tip-desc{
-  font-size:12px;
-  color:#8fa8c8;
-  line-height:1.6;
-}
-.map-wrap{
+/* ========== 地图容器 ========== */
+.map-full-container{
   flex:1;
   position:relative;
-  min-width:0;
+  min-height:0;
 }
+.map-wrap{
+  width:100%;
+  height:100%;
+  position:relative;
+}
+/* ========== 底部深蓝模糊 ========== */
+.map-full-container::before{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:0;
+  height:72px;
+  z-index:5;
+  pointer-events:none;
+  background:
+    radial-gradient(
+      ellipse at 50% 100%,
+      rgba(8,20,46,0.72) 0%,
+      rgba(14,34,76,0.35) 45%,
+      rgba(8,20,46,0.12) 75%,
+      transparent 100%
+    );
+}
+/* 底部细蓝光 */
+.map-full-container::after{
+  content:"";
+  position:absolute;
+  left:0;right:0;bottom:62px;
+  height:1px;
+  z-index:6;
+  pointer-events:none;
+  background:linear-gradient(90deg,transparent 0%,rgba(79,195,247,0.25)20%,rgba(79,195,247,0.5)50%,rgba(79,195,247,0.25)80%,transparent 100%);
+  box-shadow:0 0 10px rgba(79,195,247,0.45);
+}
+/* ========== 底部工具栏 ========== */
+.bottom-tool-bar{
+  position:absolute;
+  bottom:18px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:8;
+  background:linear-gradient(180deg,rgba(14,34,76,0.78)0%,rgba(8,20,46,0.78)100%);
+  border:1px solid rgba(79,195,247,0.35);
+  border-radius:14px;
+  padding:10px 18px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  box-shadow:0 4px 18px rgba(0,0,0,0.45),inset 0 0 0 1px rgba(79,195,247,0.08),0 0 22px rgba(79,195,247,0.12);
+}
+.tool-group{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+.divider{
+  width:1px;
+  height:28px;
+  background:#27416b;
+}
+.tool-select{
+  height:32px;
+  background:#0a1728;
+  border:1px solid rgba(79,195,247,0.25);
+  color:#d0e4ff;
+  border-radius:4px;
+  padding:0 8px;
+  font-size:13px;
+}
+.tool-btn{
+  height:32px;
+  padding:0 12px;
+  background:rgba(79,195,247,0.08);
+  border:1px solid rgba(79,195,247,0.25);
+  color:#d0e4ff;
+  border-radius:4px;
+  cursor:pointer;
+  font-size:13px;
+  white-space:nowrap;
+  transition:all .2s ease;
+}
+.tool-btn:hover{
+  background:rgba(79,195,247,0.22);
+  border-color:rgba(79,195,247,0.55);
+  box-shadow:0 0 14px rgba(79,195,247,0.3);
+}
+/* ========== 路径规划面板 ========== */
 .route-panel{
   position:absolute;
   left:16px;
   top:16px;
   width:300px;
   background:rgba(13,28,51,0.95);
-  border:1px solid #27416b;
+  border:1px solid rgba(79,195,247,0.32);
   border-radius:6px;
   padding:12px;
   z-index:999;
@@ -687,15 +932,39 @@ onUnmounted(()=>{
   display:flex;
   gap:8px;
 }
-.route-btn{
+.route-btn{ height:30px; }
+.btn-primary,.btn-gray{
+  flex:1;
   height:30px;
+  border-radius:4px;
+  border:none;
+  cursor:pointer;
+  font-size:13px;
 }
+.btn-primary{
+  background:#1e88e5;
+  color:#fff;
+}
+.btn-primary:hover{background:#2196f3;}
+.btn-gray{
+  background:#2a3d5c;
+  color:#d0e4ff;
+}
+.btn-gray:hover{background:#35496b;}
+/* ========== 右侧统计/选址面板 ========== */
 .aside-right{
+  position:absolute;
+  top:16px;
+  right:16px;
   width:300px;
-  background:#0d1c33;
-  border-left:1px solid #27416b;
+  background:linear-gradient(180deg,rgba(17,38,76,0.94)0%,rgba(10,24,52,0.94)100%);
+  border:1px solid rgba(79,195,247,0.32);
+  border-radius:12px;
   padding:14px;
   overflow-y:auto;
+  max-height:calc(100% - 110px);
+  z-index:997;
+  box-shadow:0 4px 18px rgba(0,0,0,0.45),0 0 22px rgba(79,195,247,0.12);
 }
 .stat-card{
   background:rgba(255,255,255,0.03);
@@ -711,14 +980,9 @@ onUnmounted(()=>{
   padding-left:8px;
   margin-bottom:10px;
 }
-#chartBox{
-  width:100%;
-  height:200px;
-}
-#chartType{
-  width:100%;
-  height:240px;
-}
+#chartBox{ width:100%; height:200px; }
+#chartType{ width:100%; height:240px; }
+/* ========== 弹窗 ========== */
 .modal{
   position:fixed;
   inset:0;
@@ -729,39 +993,51 @@ onUnmounted(()=>{
   z-index:2000;
 }
 .modal-content{
-  width:360px;
+  width:440px;
   background:#0d1c33;
   border:1px solid #27416b;
   border-radius:6px;
-  padding:18px;
+  padding:20px;
 }
 .modal-content h4{
   color:#4fc3f7;
-  margin-bottom:10px;
+  margin-bottom:14px;
 }
-.modal-content p{
+.form-item-modal{
+  margin-bottom:12px;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+.form-item-modal label{
   font-size:13px;
-  color:#9db8dd;
-  margin-bottom:10px;
+  color:#b8d4ff;
 }
-.modal-content input{
+.form-item-modal input{
   width:100%;
-  height:30px;
+  height:34px;
   background:#0a1728;
   border:1px solid #27416b;
   color:#d0e4ff;
   border-radius:4px;
-  padding:0 8px;
-  margin-bottom:12px;
+  padding:0 10px;
+}
+.site-tip-text{
+  white-space:pre-line;
+  font-size:13px;
+  color:#9db8dd;
+  margin:14px 0;
+  line-height:1.7;
+  background:rgba(79,195,247,0.06);
+  padding:10px;
+  border-radius:4px;
 }
 .modal-buttons{
   display:flex;
-  gap:8px;
+  gap:10px;
 }
 </style>
-
 <style>
-/*高德InfoWindow弹窗全局样式，不能加scoped */
 .info-win-root{
   position:relative;
   min-width:345px;
