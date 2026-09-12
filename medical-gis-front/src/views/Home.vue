@@ -52,7 +52,7 @@
             <button class="btn-gray route-btn" @click="clearRouteDraw">清除路线</button>
           </div>
         </div>
-        <aside class="aside-right" v-show="statPanelVisible || sitePanelVisible">
+        <aside class="aside-right" v-show="statPanelVisible || sitePanelVisible || heatStatShow">
           <div v-if="statPanelVisible" class="stat-card">
             <div class="card-title">医疗机构统计</div>
             <div id="chartBox"></div>
@@ -60,6 +60,14 @@
           <div v-if="statPanelVisible" class="stat-card">
             <div class="card-title">点位类型统计</div>
             <div id="chartType"></div>
+          </div>
+          <div v-if="heatStatShow" class="stat-card">
+            <div class="card-title">🏘️居民区就医热力统计</div>
+            <div class="win-row">居民区：{{heatStat.communityName}}</div>
+            <div class="win-row">分析半径：{{heatStat.radiusM}} 米</div>
+            <div class="win-row">医疗点位数量：{{heatStat.medicalCount}}</div>
+            <div class="win-row">可达评估：{{heatStat.level}}</div>
+            <div class="win-row" style="color:#ffe082">建议：{{heatStat.suggest}}</div>
           </div>
           <SiteSelectionPanel
             v-if="sitePanelVisible"
@@ -84,7 +92,9 @@
         <div class="divider"></div>
         <div class="tool-group">
           <button class="tool-btn" @click="openRoutePanel">🚗路径规划</button>
-          <button class="tool-btn" @click="create15MinBuffer">🟦15分钟服务圈</button>
+          <button class="tool-btn" @click="openHeatDialog">🔥热力分析</button>
+          <button class="tool-btn" @click="openResourceQuery">📋时空资源查询</button>
+          <button class="tool-btn" @click="openAppoint">🏥预约挂号</button>
           <button class="tool-btn" @click="toggleStatPanel">📊系统统计</button>
           <button class="tool-btn" @click="toggleSitePanel">📍选址分析</button>
           <button class="tool-btn" @click="aiDialogVisible=true">🤖AI就医咨询</button>
@@ -96,11 +106,11 @@
         <h4>🏥 选址评估</h4>
         <div class="form-item-modal">
           <label>分析半径(米，500‑5000)</label>
-          <input v-model.number="analyzeRadiusM" type="number" min="500" max="5000" placeholder="请填写半径"/>
+          <input v-model.number="analyzeRadiusM" type="number" min="500" max="5000" placeholder="请填写半径" />
         </div>
         <div class="form-item-modal">
           <label>评估名称</label>
-          <input v-model="evalNameInput" placeholder="填写评估名称"/>
+          <input v-model="evalNameInput" placeholder="填写评估名称" />
         </div>
         <div v-if="siteTip" class="site-tip-text">{{siteTip}}</div>
         <div class="modal-buttons">
@@ -110,6 +120,15 @@
       </div>
     </div>
     <AiChatDialog ref="aiChatRef" :visible="aiDialogVisible" @close="aiDialogVisible=false" />
+    <!-- 传给热力 allRawMedical 全部医疗点，不受下拉筛选影响 -->
+    <HeatMapDialog
+      :visible="heatDialogVisible"
+      :map-ins="map"
+      :medical-point-list="allRawMedical"
+      @close="heatDialogVisible=false"
+      @update-stat-panel="onHeatStatUpdate"
+      @closeAll="()=>{heatDialogVisible=false; heatStatShow=false; heatStat={};}"
+    />
   </div>
 </template>
 
@@ -119,6 +138,7 @@ import {useRouter} from 'vue-router'
 import MapContainer from '../components/MapContainer.vue'
 import AiChatDialog from '../components/AiChatDialog.vue'
 import SiteSelectionPanel from '../components/SiteSelectionPanel.vue'
+import HeatMapDialog from '../components/HeatMapDialog.vue'
 import request from '../api/request'
 import * as turf from '@turf/turf'
 import * as echarts from 'echarts'
@@ -137,7 +157,6 @@ let autoEnd = null
 let geocoder = null
 let placeSearch = null
 let routePluginsReady = false
-
 const userInfo = ref(getUserInfo())
 const loadPointType = ref('')
 const showSiteModal = ref(false)
@@ -169,7 +188,30 @@ const toast = ref({
   type:'success'
 })
 
-// 点位被点击，路径规划模式下直接填入起点终点
+// =========热力弹窗相关==========
+const heatDialogVisible = ref(false)
+const rawMedicalData = ref([])
+// allRawMedical：存储**全部医疗点位**（医院、药店、社区卫生中心，专门给热力）
+const allRawMedical = ref([])
+const rawCommunityData = ref([])
+const heatStatShow = ref(false)
+const heatStat = ref({})
+
+function openHeatDialog(){
+  if(allRawMedical.value.length === 0){
+    showToast("请先加载医疗点位！","warning")
+    return
+  }
+  heatDialogVisible.value = true
+}
+function onHeatStatUpdate(res){
+  heatStat.value = res
+  heatStatShow.value = true
+}
+
+function openResourceQuery(){}
+function openAppoint(){}
+
 function fillRouteByPoint(name,lng,lat){
   const lnglatObj = new window.AMap.LngLat(lng,lat)
   if(!route.value.startLngLat){
@@ -267,6 +309,7 @@ function toggleSitePanel(){
   }
   sitePanelVisible.value = !sitePanelVisible.value
   statPanelVisible.value = false
+  heatStatShow.value = false
   if(sitePanelVisible.value){
     isSiteSelectMode.value = true
     siteTip.value = "🟢请在地图上点击，选取候选选址点"
@@ -328,7 +371,6 @@ async function confirmSiteEval(){
       lat:tempSiteLat.value,
       resultJson: JSON.stringify(analyzeResult)
     })
-    console.log('选址接口返回',res)
     showToast("选址评估保存成功！","success")
     siteNeedRefresh.value = true
     evalNameInput.value = ''
@@ -355,6 +397,7 @@ function closeSiteModal(){
 async function toggleStatPanel(){
   statPanelVisible.value = !statPanelVisible.value
   sitePanelVisible.value = false
+  heatStatShow.value = false
   isSiteSelectMode.value = false
   clearSiteBufferDraw()
   if(statPanelVisible.value){
@@ -373,7 +416,6 @@ async function refreshStat(){
   chartType.setOption({tooltip:{trigger:'axis'},xAxis:{data:resType.data.map(i=>i.type)},yAxis:{},series:[{type:'bar',data:resType.data.map(i=>i.cnt)}]})
 }
 
-// ============ 驾车路径规划 ============
 function initRoutePlugins(){
   if(routePluginsReady) return Promise.resolve()
   return new Promise((resolve)=>{
@@ -543,7 +585,6 @@ const handleLogout = ()=>{
   router.push('/login')
 }
 
-// 加载医疗点位
 async function handleLoadPoint(){
   if(!loadPointType.value) return showToast("请选择点位类型","warning")
   if(loadPointType.value === 'community'){
@@ -551,6 +592,12 @@ async function handleLoadPoint(){
   }else{
     const url = '/medical/point?type='+encodeURIComponent(loadPointType.value)
     const res = await request.get(url)
+    // 第一次加载医疗点，拉取全部医疗点存入allRawMedical（热力分析专用）
+    if(allRawMedical.value.length === 0){
+      const resAll = await request.get('/medical/point')
+      allRawMedical.value = [...resAll.data]
+    }
+    rawMedicalData.value = [...res.data]
     allMedicalPoints.value = res.data.map(p=>turf.point([p.lng,p.lat],{name:p.name,type:p.type}))
     res.data.forEach(item=>{
       const marker = new window.AMap.Marker({
@@ -560,14 +607,11 @@ async function handleLoadPoint(){
         offset: new window.AMap.Pixel(-9,-9),
         map:map
       })
-
       marker.on('click',()=>{
-        // 核心：驾车面板打开，直接填点，不弹详情弹窗
         if(routePanelShow.value){
           fillRouteByPoint(item.name, item.lng, item.lat)
           return
         }
-        // 关闭状态，正常打开收藏留言弹窗
         if(currentInfoWin) currentInfoWin.close()
         let htmlPopup = buildPointPopupHtml(item)
         const infoWin = new window.AMap.InfoWindow({
@@ -591,11 +635,15 @@ function clearAllMarker(){
   driving = null
   clearSiteBufferDraw()
   allMedicalPoints.value = []
+  rawMedicalData.value = []
+  allRawMedical.value = []
+  rawCommunityData.value = []
+  heatStatShow.value = false
 }
 
-// 加载居民区点位
 async function loadCommunityPoint(){
   const res = await request.get('/gisExtra/communityByRadius?lng=121.54&lat=31.22&radius=20000')
+  rawCommunityData.value = [...res.data]
   res.data.forEach(item=>{
     const marker = new window.AMap.Marker({
       position:[item.lng,item.lat],
@@ -604,7 +652,6 @@ async function loadCommunityPoint(){
       offset: new window.AMap.Pixel(-7,-7),
       map:map
     })
-
     marker.on('click',()=>{
       if(routePanelShow.value){
         fillRouteByPoint(item.name, item.lng, item.lat)
@@ -630,20 +677,6 @@ async function loadCommunityPoint(){
   })
 }
 
-async function create15MinBuffer(){
-  const res = await request.get('/medical/siteQuery')
-  res.data.forEach(p=>{
-    const pt = turf.point([p.lng,p.lat])
-    const buf = turf.buffer(pt,1.5,{units:'kilometers'})
-    new window.AMap.Polygon({
-      path:buf.geometry.coordinates[0],
-      fillColor:'rgba(64,169,255,0.15)',
-      strokeColor:'#4fc3f7',
-      map:map
-    })
-  })
-}
-
 onUnmounted(()=>{
   clearSiteBufferDraw()
   if(map){
@@ -659,7 +692,6 @@ onUnmounted(()=>{
   driving = null
   geocoder = null
   placeSearch = null
-  document.querySelectorAll('.amap-sug-result').forEach(el=>el.remove())
 })
 </script>
 
@@ -689,7 +721,6 @@ onUnmounted(()=>{
 .toast-box.success{background:#198754;color:#fff;}
 .toast-box.error{background:#dc3545;color:#fff;}
 .toast-box.warning{background:#ffc107;color:#111;}
-/* ========= 顶部栏：中间向下凸起 ========= */
 .top-header{
   height:84px;
   position:relative;
@@ -918,7 +949,7 @@ onUnmounted(()=>{
   display:flex;
   align-items:center;
   gap:14px;
-  box-shadow:0 4px 18px rgba(0,0,0,0.45),inset 0 0 0 1px rgba(79,195,247,0.08),0 0 22px rgba(79,195,247,0.12);
+  box-shadow:0 4px 18px rgba(0,0,0.45),inset 0 0 0 1px rgba(79,195,247,0.08),0 0 22px rgba(79,195,247,0.12);
 }
 .tool-group{
   display:flex;
@@ -1042,7 +1073,7 @@ onUnmounted(()=>{
   overflow-y:auto;
   max-height:calc(100% - 110px);
   z-index:997;
-  box-shadow:0 4px 18px rgba(0,0,0,0.45),0 0 22px rgba(79,195,247,0.12);
+  box-shadow:0 4px 18px rgba(0,0,0.45),0 0 22px rgba(79,195,247,0.12);
 }
 .stat-card{
   background:rgba(255,255,255,0.03);
@@ -1114,7 +1145,6 @@ onUnmounted(()=>{
   gap:10px;
 }
 </style>
-
 <style>
 .info-win-root{
   position:relative;
