@@ -14,6 +14,7 @@
         <div class="title-wrap">
           <span class="title-glow"></span>
           <h1>浦东新区公共医疗资源服务平台</h1>
+          <div class="title-en">PUDONG NEW AREA PUBLIC MEDICAL RESOURCE SERVICE PLATFORM</div>
           <span class="title-line"></span>
         </div>
       </div>
@@ -75,10 +76,142 @@
             @locate-map="handleSiteLocate"
           />
         </aside>
+        <div class="hud-left-rail">
+          <div class="side-head">
+            <div>
+              <span class="side-kicker">RESOURCE OVERVIEW</span>
+              <strong>医疗资源实时态势</strong>
+            </div>
+            <span class="side-live"><i></i>LIVE</span>
+          </div>
+
+          <div class="live-total-card real-poi-card">
+            <div>
+              <span>行政区医疗 POI</span>
+              <small>上海市各区县实时医疗数据</small>
+            </div>
+            <strong>{{livePoi.totalHits}}</strong>
+          </div>
+
+          <div class="district-live-bar">
+            <div>
+              <span>当前监测区域</span>
+              <b>{{livePoi.district}}</b>
+            </div>
+          </div>
+
+          <div class="side-section live-resource-list">
+            <div class="side-section-title"><i></i>现实医疗资源检索</div>
+            <div class="live-row real-row">
+              <span><em class="legend-dot hospital"></em>医院</span>
+              <b>{{livePoi.hospital}}</b>
+              <i><span :style="{width: livePoi.maxCount ? Math.min(100, livePoi.hospital / livePoi.maxCount * 100) + '%' : '0%'}"></span></i>
+            </div>
+            <div class="live-row real-row">
+              <span><em class="legend-dot health"></em>社区卫生</span>
+              <b>{{livePoi.health}}</b>
+              <i><span :style="{width: livePoi.maxCount ? Math.min(100, livePoi.health / livePoi.maxCount * 100) + '%' : '0%'}"></span></i>
+            </div>
+            <div class="live-row real-row">
+              <span><em class="legend-dot pharmacy"></em>药店</span>
+              <b>{{livePoi.pharmacy}}</b>
+              <i><span :style="{width: livePoi.maxCount ? Math.min(100, livePoi.pharmacy / livePoi.maxCount * 100) + '%' : '0%'}"></span></i>
+            </div>
+          </div>
+
+          <div class="side-section poi-monitor-section">
+            <div class="side-section-title"><i></i>实时数据监测</div>
+            <div class="poi-monitor-grid">
+              <div>
+                <span>数据源</span>
+                <b>{{livePoi.online ? '3 / 3' : '0 / 3'}}</b>
+                <small>医疗 POI 服务</small>
+              </div>
+              <div>
+                <span>响应耗时</span>
+                <b>{{livePoi.latency}}<em>ms</em></b>
+                <small>本次同步</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="backend-mini-status">
+            <span>平台数据库</span>
+            <b>{{liveData.total}}</b>
+            <i></i>
+            <small>{{liveData.online ? '已同步' : '离线'}}</small>
+          </div>
+
+        </div>
+
+        <div class="hud-right-rail">
+          <div class="side-head">
+            <div>
+              <span class="side-kicker">REAL-TIME ENVIRONMENT</span>
+              <strong>城市运行监测</strong>
+            </div>
+            <span class="side-index">02</span>
+          </div>
+
+          <div class="weather-live-card">
+            <div class="weather-icon">☁</div>
+            <div>
+              <span>上海 · 浦东</span>
+              <strong>{{liveWeather.temperature}}<small>℃</small></strong>
+              <b>{{liveWeather.weather}}</b>
+            </div>
+          </div>
+
+          <div class="weather-grid">
+            <div><span>湿度</span><b>{{liveWeather.humidity}}%</b></div>
+            <div><span>风向</span><b>{{liveWeather.windDirection}}</b></div>
+            <div><span>风力</span><b>{{liveWeather.windPower}} 级</b></div>
+            <div><span>发布时间</span><b>{{liveWeather.reportTime}}</b></div>
+          </div>
+
+          <div class="side-section traffic-live">
+            <div class="side-section-title"><i></i>实时路况</div>
+            <div class="traffic-state">
+              <span class="traffic-light"></span>
+              <div>
+                <b>{{trafficStatus}}</b>
+                <small>{{trafficMessage}}</small>
+              </div>
+              <strong>{{trafficLayerReady ? '实时' : '连接中'}}</strong>
+            </div>
+            <div class="traffic-line"><i></i></div>
+            <div class="traffic-foot">
+              <span>路况图层自动刷新</span>
+              <b>180s</b>
+            </div>
+          </div>
+
+          <div class="side-section realtime-clock-panel">
+            <div class="side-section-title"><i></i>系统时间</div>
+            <div class="realtime-clock-plain">
+              <div class="clock-time-row">
+                <span class="clock-time">{{liveClock.time}}</span>
+                <span class="clock-date">{{liveClock.date}}</span>
+              </div>
+              <div class="clock-meta">
+                <span>{{liveClock.week}}</span>
+                <b><i></i>实时</b>
+              </div>
+            </div>
+          </div>
+
+        </div>
         <div class="toast-wrap" v-if="toast.show">
           <div class="toast-box" :class="toast.type">{{toast.msg}}</div>
         </div>
       </section>
+      <div class="bottom-status-left" aria-hidden="true">
+        <span class="status-pulse"></span>
+        <span>系统运行中</span>
+        <i></i>
+        <span>GIS 在线</span>
+      </div>
+
       <div class="bottom-tool-bar">
         <div class="tool-group">
           <select v-model="loadPointType" class="tool-select">
@@ -100,6 +233,11 @@
           <button class="tool-btn" @click="aiDialogVisible=true">🤖AI就医咨询</button>
         </div>
       </div>
+
+      <div class="bottom-status-right" aria-hidden="true">
+        <span>医疗资源 GIS</span>
+        <b>01</b>
+      </div>
     </div>
     <div class="modal" v-if="showSiteModal">
       <div class="modal-content">
@@ -120,7 +258,6 @@
       </div>
     </div>
     <AiChatDialog ref="aiChatRef" :visible="aiDialogVisible" @close="aiDialogVisible=false" />
-    <!-- 传给热力 allRawMedical 全部医疗点，不受下拉筛选影响 -->
     <HeatMapDialog
       :visible="heatDialogVisible"
       :map-ins="map"
@@ -144,7 +281,6 @@ import * as turf from '@turf/turf'
 import * as echarts from 'echarts'
 import {getUserInfo,clearStorage} from '../utils/storage'
 import {buildPointPopupHtml, bindPopupDomEvent} from '../utils/popupHelper'
-
 const router = useRouter()
 const aiDialogVisible = ref(false)
 const aiChatRef = ref(null)
@@ -188,14 +324,259 @@ const toast = ref({
   type:'success'
 })
 
-// =========热力弹窗相关==========
 const heatDialogVisible = ref(false)
 const rawMedicalData = ref([])
-// allRawMedical：存储**全部医疗点位**（医院、药店、社区卫生中心，专门给热力）
 const allRawMedical = ref([])
 const rawCommunityData = ref([])
 const heatStatShow = ref(false)
 const heatStat = ref({})
+
+/* 实时驾驶舱数据：来源于现有后端统计接口 + 高德实时天气/路况服务 */
+const liveData = ref({
+  total: 0,
+  hospital: 0,
+  health: 0,
+  other: 0,
+  updatedAt: '--:--:--',
+  online: false
+})
+const liveWeather = ref({
+  temperature: '--',
+  weather: '--',
+  humidity: '--',
+  windDirection: '--',
+  windPower: '--',
+  reportTime: '--'
+})
+const liveClock = ref({
+  date: '--/--/--',
+  time: '--:--:--',
+  week: '星期--'
+})
+const livePoi = ref({
+  hospital: 0,
+  health: 0,
+  pharmacy: 0,
+  totalHits: 0,
+  maxCount: 0,
+  samples: [],
+  district: '浦东新区',
+  districtCode: '310115',
+  updatedAt: '--:--:--',
+  online: false,
+  latency: 0
+})
+
+// 上海 16 个行政区，按 5 秒一档自动轮巡；每个区首次进入时实时查询，之后使用本轮缓存，避免高频重复请求
+const shanghaiDistricts = [
+  {name:'浦东新区', code:'310115'},
+  {name:'黄浦区', code:'310101'},
+  {name:'徐汇区', code:'310104'},
+  {name:'长宁区', code:'310105'},
+  {name:'静安区', code:'310106'},
+  {name:'普陀区', code:'310107'},
+  {name:'虹口区', code:'310109'},
+  {name:'杨浦区', code:'310110'},
+  {name:'闵行区', code:'310112'},
+  {name:'宝山区', code:'310113'},
+  {name:'嘉定区', code:'310114'},
+  {name:'金山区', code:'310116'},
+  {name:'松江区', code:'310117'},
+  {name:'青浦区', code:'310118'},
+  {name:'奉贤区', code:'310120'},
+  {name:'崇明区', code:'310151'}
+]
+const districtPoiCache = new Map()
+let districtIndex = 0
+let livePoiSearchTimer = null
+const trafficStatus = ref('路况同步中')
+const trafficMessage = ref('实时交通图层正在连接')
+const trafficLayerReady = ref(false)
+const mapCenterText = ref('--')
+const mapZoom = ref('--')
+let liveDashboardTimer = null
+let clockTimer = null
+let trafficLayer = null
+let weatherInstance = null
+
+function formatNow(){
+  return new Date().toLocaleTimeString('zh-CN',{hour12:false})
+}
+
+function refreshRealtimeClock(){
+  const now = new Date()
+  const pad = n => String(n).padStart(2,'0')
+  const weekNames = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六']
+  liveClock.value = {
+    date: `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())}`,
+    time: `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
+    week: weekNames[now.getDay()]
+  }
+}
+
+function resourcePercent(value){
+  const total = Number(livePoi.value.totalHits || 0)
+  if(total <= 0) return 0
+  return Math.max(3, Math.min(100, Math.round(Number(value || 0) / total * 100)))
+}
+
+function classifyMedicalType(type){
+  const t = String(type || '')
+  if(t.includes('医院')) return 'hospital'
+  if(t.includes('社区') || t.includes('卫生')) return 'health'
+  return 'other'
+}
+
+async function refreshLiveDashboard(){
+  try{
+    const [resTotal,resType] = await Promise.all([
+      request.get('/stat/countAll'),
+      request.get('/stat/countByType')
+    ])
+    const total = Number(resTotal?.data?.total || 0)
+    const typeList = Array.isArray(resType?.data) ? resType.data : []
+    const counters = {hospital:0,health:0,other:0}
+    typeList.forEach(item=>{
+      const key = classifyMedicalType(item?.type)
+      counters[key] += Number(item?.cnt || 0)
+    })
+    liveData.value = {
+      total,
+      ...counters,
+      updatedAt: formatNow(),
+      online: true
+    }
+  }catch(e){
+    console.error('实时驾驶舱统计数据刷新失败',e)
+    liveData.value = {
+      ...liveData.value,
+      updatedAt: formatNow(),
+      online: false
+    }
+  }
+}
+
+function searchDistrictPoi(keyword, district){
+  return new Promise((resolve)=>{
+    if(!window.AMap) return resolve({count:0,pois:[]})
+    const search = new window.AMap.PlaceSearch({
+      city:district.code,
+      citylimit:true,
+      pageSize:20,
+      pageIndex:1,
+      extensions:'all'
+    })
+    search.search(keyword,(status,result)=>{
+      if(status === 'complete' && result?.poiList){
+        resolve({
+          count:Number(result.poiList.count || 0),
+          pois:Array.isArray(result.poiList.pois) ? result.poiList.pois : []
+        })
+      }else{
+        resolve({count:0,pois:[]})
+      }
+    })
+  })
+}
+
+async function refreshRealWorldMedicalPoi(district = shanghaiDistricts[districtIndex]){
+  if(!window.AMap || !district) return
+  const cached = districtPoiCache.get(district.code)
+  if(cached){
+    livePoi.value = {...cached, district:district.name, districtCode:district.code}
+    return
+  }
+
+  const startedAt = performance.now()
+  try{
+    await new Promise(resolve=>window.AMap.plugin(['AMap.PlaceSearch'],resolve))
+    const [hospital,health,pharmacy] = await Promise.all([
+      searchDistrictPoi('医院',district),
+      searchDistrictPoi('社区卫生服务中心',district),
+      searchDistrictPoi('药店',district)
+    ])
+    const counts = [hospital.count,health.count,pharmacy.count]
+    const result = {
+      hospital:hospital.count,
+      health:health.count,
+      pharmacy:pharmacy.count,
+      totalHits:hospital.count + health.count + pharmacy.count,
+      maxCount:Math.max(...counts,1),
+      samples:[],
+      updatedAt:formatNow(),
+      online:true,
+      latency:Math.max(1,Math.round(performance.now() - startedAt)),
+      district:district.name,
+      districtCode:district.code,
+    }
+    districtPoiCache.set(district.code,result)
+    livePoi.value = result
+  }catch(e){
+    console.error(`${district.name} 高德实时医疗POI同步失败`,e)
+    livePoi.value = {
+      ...livePoi.value,
+      district:district.name,
+      districtCode:district.code,
+      updatedAt:formatNow(),
+      online:false,
+      latency:Math.max(1,Math.round(performance.now() - startedAt)),
+    }
+  }
+}
+
+async function rotateDistrictPoi(){
+  districtIndex = (districtIndex + 1) % shanghaiDistricts.length
+  const district = shanghaiDistricts[districtIndex]
+  livePoi.value = {...livePoi.value, district:district.name, districtCode:district.code}
+  await refreshRealWorldMedicalPoi(district)
+}
+
+function initRealtimeWeather(){
+  if(!window.AMap) return
+  window.AMap.plugin('AMap.Weather',()=>{
+    weatherInstance = new window.AMap.Weather()
+    weatherInstance.getLive('浦东新区',(err,data)=>{
+      if(err || !data) return
+      liveWeather.value = {
+        temperature: data.temperature ?? '--',
+        weather: data.weather || '--',
+        humidity: data.humidity ?? '--',
+        windDirection: data.windDirection || '--',
+        windPower: data.windPower ?? '--',
+        reportTime: data.reportTime ? String(data.reportTime).slice(-8) : '--'
+      }
+    })
+  })
+}
+
+function initRealtimeTraffic(){
+  if(!map || !window.AMap?.TileLayer?.Traffic) return
+  try{
+    trafficLayer = new window.AMap.TileLayer.Traffic({
+      autoRefresh:true,
+      interval:180,
+      zIndex:8,
+      opacity:.62
+    })
+    map.add(trafficLayer)
+    trafficLayerReady.value = true
+    trafficStatus.value = '实时路况在线'
+    trafficMessage.value = '高德交通图层已接入'
+  }catch(e){
+    console.error('实时路况图层初始化失败',e)
+    trafficStatus.value = '路况服务不可用'
+    trafficMessage.value = '请检查高德地图 Key / 权限'
+  }
+}
+
+function refreshMapLiveState(){
+  if(!map) return
+  try{
+    const center = map.getCenter()
+    mapCenterText.value = `${center.getLng().toFixed(3)}, ${center.getLat().toFixed(3)}`
+    mapZoom.value = Number(map.getZoom()).toFixed(1)
+  }catch(e){}
+}
 
 function openHeatDialog(){
   if(allRawMedical.value.length === 0){
@@ -208,10 +589,8 @@ function onHeatStatUpdate(res){
   heatStat.value = res
   heatStatShow.value = true
 }
-
 function openResourceQuery(){}
 function openAppoint(){}
-
 function fillRouteByPoint(name,lng,lat){
   const lnglatObj = new window.AMap.LngLat(lng,lat)
   if(!route.value.startLngLat){
@@ -224,7 +603,6 @@ function fillRouteByPoint(name,lng,lat){
     routeClickTip.value = `✅终点：${name}｜点击生成驾车路径`
   }
 }
-
 function showToast(msg,type='success'){
   toast.value.msg = msg
   toast.value.type = type
@@ -239,11 +617,46 @@ onMounted(async ()=>{
   }catch(e){
     console.error("读取医疗点位类型失败",e)
   }
+
+  await refreshLiveDashboard()
+  initRealtimeWeather()
+  districtIndex = 0
+  await refreshRealWorldMedicalPoi(shanghaiDistricts[districtIndex])
+
+  refreshRealtimeClock()
+  clockTimer = setInterval(()=>{
+    refreshRealtimeClock()
+    liveData.value.updatedAt = formatNow()
+    refreshMapLiveState()
+  },1000)
+
+  liveDashboardTimer = setInterval(()=>{
+    refreshLiveDashboard()
+    initRealtimeWeather()
+  },30000)
+
+  // 5 秒切换一个行政区；首次进入该区时向高德发起真实 POI 查询，已查询区域从缓存读取
+  livePoiSearchTimer = setInterval(()=>{
+    rotateDistrictPoi()
+  },5000)
+
 })
 
 const onMapReady = (m)=>{
   map = m
+
+  // 高德地图深色科技风底图，与系统 HUD 深蓝主题统一
+  try{
+    map.setMapStyle('amap://styles/blue')
+  }catch(e){
+    console.warn('高德深色地图样式设置失败，将继续使用默认地图样式', e)
+  }
+
   map.on('click', globalMapClickHandler)
+  map.on('moveend', refreshMapLiveState)
+  map.on('zoomend', refreshMapLiveState)
+  refreshMapLiveState()
+  initRealtimeTraffic()
 }
 
 function globalMapClickHandler(e){
@@ -585,6 +998,18 @@ const handleLogout = ()=>{
   router.push('/login')
 }
 
+// 获取医疗点marker样式
+function getMedicalMarkerStyle(type){
+  const t = String(type || '').toLowerCase()
+  if(t.includes('医院')){
+    return { color:'#e53935', glow:'rgba(229, 57, 53, 0.55)', icon:'医' }
+  }
+  if(t.includes('社区') || t.includes('卫生')){
+    return { color:'#1e88e5', glow:'rgba(30, 136, 229, 0.55)', icon:'卫' }
+  }
+  return { color:'#fdd835', glow:'rgba(253, 216, 53, 0.55)', icon:'药' }
+}
+
 async function handleLoadPoint(){
   if(!loadPointType.value) return showToast("请选择点位类型","warning")
   if(loadPointType.value === 'community'){
@@ -592,7 +1017,6 @@ async function handleLoadPoint(){
   }else{
     const url = '/medical/point?type='+encodeURIComponent(loadPointType.value)
     const res = await request.get(url)
-    // 第一次加载医疗点，拉取全部医疗点存入allRawMedical（热力分析专用）
     if(allRawMedical.value.length === 0){
       const resAll = await request.get('/medical/point')
       allRawMedical.value = [...resAll.data]
@@ -600,11 +1024,62 @@ async function handleLoadPoint(){
     rawMedicalData.value = [...res.data]
     allMedicalPoints.value = res.data.map(p=>turf.point([p.lng,p.lat],{name:p.name,type:p.type}))
     res.data.forEach(item=>{
+      const markerStyle = getMedicalMarkerStyle(item.type)
       const marker = new window.AMap.Marker({
         position:[item.lng,item.lat],
         title:item.name,
-        content:`<div style="width:16px;height:16px;border-radius:50%;background:#d82626;display:flex;align-items:center;justify-content:center;color:#ffffff;font-weight:bold;font-size:14px;line-height:1;">+</div>`,
-        offset: new window.AMap.Pixel(-9,-9),
+        content:`
+<div style="
+  width:14px;
+  height:18px;
+  position:relative;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)) drop-shadow(0 1px 1px rgba(0,0,0,0.25));
+">
+  <div style="
+    position:absolute;
+    left:0;
+    right:0;
+    top:0;
+    height:14px;
+    background: ${markerStyle.color};
+    border-radius:8px 8px 4px 4px;
+    border: 1px solid rgba(255,255,255,0.45);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.55),
+      inset 0 -2px 4px rgba(0,0,0,0.18),
+      0 1px 4px ${markerStyle.glow};
+  "></div>
+  <div style="
+    position:absolute;
+    left:2px;
+    top:3px;
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.95);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:${markerStyle.color};
+    font-weight:800;
+    font-size:9px;
+    line-height:1;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);
+  ">${markerStyle.icon}</div>
+  <div style="
+    position:absolute;
+    left:50%;
+    bottom:-2px;
+    transform:translateX(-50%);
+    width:6px;
+    height:6px;
+    background:${markerStyle.color};
+    border:1px solid rgba(255,255,255,0.4);
+    border-radius:0 0 50% 50%;
+    box-shadow:0 1px 3px ${markerStyle.glow};
+  "></div>
+</div>`,
+offset: new window.AMap.Pixel(-7, -18),
         map:map
       })
       marker.on('click',()=>{
@@ -648,8 +1123,58 @@ async function loadCommunityPoint(){
     const marker = new window.AMap.Marker({
       position:[item.lng,item.lat],
       title:item.name,
-      content:`<div style="width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;">🏠</div>`,
-      offset: new window.AMap.Pixel(-7,-7),
+      content:`
+<div style="
+  width:14px;
+  height:18px;
+  position:relative;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)) drop-shadow(0 1px 1px rgba(0,0,0,0.25));
+">
+  <div style="
+    position:absolute;
+    left:0;
+    right:0;
+    top:0;
+    height:14px;
+    background: linear-gradient(180deg, #66bb6a 0%, #2e7d32 100%);
+    border-radius:8px 8px 4px 4px;
+    border: 1px solid rgba(255,255,255,0.45);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.55),
+      inset 0 -2px 4px rgba(0,0,0,0.18),
+      0 1px 4px rgba(46, 125, 50, 0.45);
+  "></div>
+  <div style="
+    position:absolute;
+    left:2px;
+    top:3px;
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:rgba(255,255,255,0.95);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#2e7d32;
+    font-weight:800;
+    font-size:9px;
+    line-height:1;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);
+  ">居</div>
+  <div style="
+    position:absolute;
+    left:50%;
+    bottom:-2px;
+    transform:translateX(-50%);
+    width:6px;
+    height:6px;
+    background:#2e7d32;
+    border:1px solid rgba(255,255,255,0.4);
+    border-radius:0 0 50% 50%;
+    box-shadow:0 1px 3px rgba(46, 125, 50, 0.45);
+  "></div>
+</div>`,
+offset: new window.AMap.Pixel(-7, -18),
       map:map
     })
     marker.on('click',()=>{
@@ -679,8 +1204,19 @@ async function loadCommunityPoint(){
 
 onUnmounted(()=>{
   clearSiteBufferDraw()
+  if(liveDashboardTimer) clearInterval(liveDashboardTimer)
+  if(livePoiSearchTimer) clearInterval(livePoiSearchTimer)
+  if(clockTimer) clearInterval(clockTimer)
+  liveDashboardTimer = null
+  clockTimer = null
   if(map){
     map.off('click', globalMapClickHandler)
+    map.off('moveend', refreshMapLiveState)
+    map.off('zoomend', refreshMapLiveState)
+    if(trafficLayer){
+      map.remove(trafficLayer)
+      trafficLayer = null
+    }
   }
   if(currentInfoWin){
     currentInfoWin.close()
@@ -694,543 +1230,4 @@ onUnmounted(()=>{
   placeSearch = null
 })
 </script>
-
-<style scoped>
-*{margin:0;padding:0;box-sizing:border-box;}
-.app-wrap{
-  width:100vw;
-  height:100vh;
-  display:flex;
-  flex-direction:column;
-  background:#081428;
-  color:#fff;
-  overflow:hidden;
-}
-.toast-wrap{
-  position:fixed;
-  z-index:99999;
-  top:90px;
-  left:50%;
-  transform:translateX(-50%);
-}
-.toast-box{
-  padding:10px 22px;
-  border-radius:6px;
-  font-size:14px;
-}
-.toast-box.success{background:#198754;color:#fff;}
-.toast-box.error{background:#dc3545;color:#fff;}
-.toast-box.warning{background:#ffc107;color:#111;}
-.top-header{
-  height:84px;
-  position:relative;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:0 32px;
-  flex-shrink:0;
-  z-index:100;
-  background:linear-gradient(180deg,rgba(7,18,40,0.98) 0%,rgba(11,30,64,0.96) 46%,rgba(14,40,90,0.94)100%);
-  border-bottom:1px solid rgba(79,195,247,0.45);
-  box-shadow:0 2px 0 rgba(0,0,0,0.55),0 10px 24px rgba(0,0,0,0.55),inset 0 1px 0 rgba(120,200,255,0.08);
-}
-.top-cap{
-  position:absolute;
-  left:0;
-  right:0;
-  top:0;
-  height:26px;
-  z-index:2;
-  background:linear-gradient(180deg,rgba(5,12,28,0.99),rgba(9,22,48,0.96));
-  border-bottom:1px solid rgba(79,195,247,0.22);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.04),inset 0 -8px 14px rgba(0,0,0,0.45);
-}
-.center-bulge{
-  position:absolute;
-  left:50%;
-  top:24px;
-  transform:translateX(-50%);
-  width:54%;
-  height:60px;
-  z-index:3;
-  background:linear-gradient(180deg,rgba(12,34,72,0.97)0%,rgba(18,56,124,0.94)45%,rgba(10,28,60,0.96)100%);
-  border:1px solid rgba(79,195,247,0.35);
-  border-top:1px solid rgba(79,195,247,0.55);
-  border-radius:18px 18px 26px 26px;
-  box-shadow:0 14px 28px rgba(0,0,0,0.55),0 0 0 1px rgba(0,0,0,0.35),inset 0 1px 0 rgba(255,255,255,0.08),inset 0 -10px 18px rgba(0,0,0,0.35);
-  clip-path:polygon(8% 0,92% 0,100% 0,100% 70%,94% 100%,6% 100%,0 70%,0 0);
-}
-.bulge-inner{
-  position:absolute;
-  left:6%;
-  right:6%;
-  top:10px;
-  height:18px;
-  border-radius:50%;
-  background:linear-gradient(180deg,rgba(79,195,247,0.18)0%,rgba(79,195,247,0.04)100%);
-  border:1px solid rgba(79,195,247,0.25);
-  border-bottom:none;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.06),0 0 12px rgba(79,195,247,0.12);
-}
-.bulge-glow{
-  position:absolute;
-  left:18%;
-  right:18%;
-  bottom:10px;
-  height:1px;
-  background:linear-gradient(90deg,transparent 0%,rgba(79,195,247,0.45)20%,rgba(79,195,247,0.95)50%,rgba(79,195,247,0.45)80%,transparent 100%);
-  box-shadow:0 0 10px rgba(79,195,247,0.55),0 0 24px rgba(79,195,247,0.25);
-}
-.header-left,.header-right{
-  position:relative;
-  z-index:4;
-  display:flex;
-  align-items:center;
-  gap:12px;
-  flex:1;
-}
-.header-right{
-  justify-content:flex-end;
-}
-.header-center{
-  position:relative;
-  z-index:5;
-  flex:2;
-  display:flex;
-  justify-content:center;
-  align-items:flex-start;
-  padding-top:4px;
-}
-.title-wrap{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  padding:6px 18px;
-}
-.title-glow{
-  width:9px;
-  height:9px;
-  border-radius:50%;
-  background:#4fc3f7;
-  position:relative;
-  box-shadow:0 0 10px #4fc3f7,0 0 22px rgba(79,195,247,0.75);
-}
-.title-glow::after{
-  content:"";
-  position:absolute;
-  inset:-6px;
-  border-radius:50%;
-  border:1px solid rgba(79,195,247,0.45);
-  animation:titlePulse 2.4s infinite ease-in-out;
-}
-@keyframes titlePulse{
-  0%{ transform:scale(0.85); opacity:0.8; }
-  50%{ transform:scale(1.2); opacity:0.35; }
-  100%{ transform:scale(0.85); opacity:0.8; }
-}
-.header-center h1{
-  font-size:19px;
-  font-weight:600;
-  letter-spacing:1.4px;
-  color:#eaf6ff;
-  background:linear-gradient(180deg,#ffffff 0%,#9fd8ff 100%);
-  -webkit-background-clip:text;
-  background-clip:text;
-  -webkit-text-fill-color:transparent;
-  text-shadow:0 0 18px rgba(79,195,247,0.35);
-  margin:0;
-}
-.title-line{
-  width:44px;
-  height:1px;
-  background:linear-gradient(90deg,transparent,#4fc3f7,transparent);
-}
-.logo-icon{
-  width:26px;
-  height:26px;
-  background:rgba(229,57,53,0.14);
-  border:1px solid rgba(229,57,53,0.45);
-  border-radius:50%;
-  position:relative;
-  box-shadow:0 0 12px rgba(229,57,53,0.35);
-}
-.logo-icon::before,.logo-icon::after{
-  content:"";
-  position:absolute;
-  background:#ff5f5f;
-  box-shadow:0 0 10px rgba(255,95,95,0.6);
-  border-radius:2px;
-}
-.logo-icon::before{
-  width:5px;height:14px;
-  left:50%;top:50%;
-  transform:translate(-50%,-50%);
-}
-.logo-icon::after{
-  width:14px;height:5px;
-  left:50%;top:50%;
-  transform:translate(-50%,-50%);
-}
-.user-text{color:#b8d4ff;}
-.tag-admin{
-  padding:2px 8px;
-  background:rgba(79,195,247,0.18);
-  color:#4fc3f7;
-  border:1px solid rgba(79,195,247,0.4);
-  border-radius:3px;
-  font-size:12px;
-}
-.top-btn{
-  padding:6px 14px;
-  background:rgba(255,255,255,0.06);
-  border:1px solid rgba(120,200,255,0.18);
-  color:#d0e4ff;
-  border-radius:4px;
-  cursor:pointer;
-  font-size:13px;
-  transition:all .2s ease;
-}
-.top-btn:hover{
-  background:rgba(79,195,247,0.18);
-  border-color:rgba(79,195,247,0.5);
-  box-shadow:0 0 12px rgba(79,195,247,0.25);
-}
-.btn-logout:hover{
-  background:rgba(255,87,87,0.22);
-  border-color:rgba(255,120,120,0.45);
-  box-shadow:0 0 12px rgba(255,87,87,0.25);
-}
-.map-full-container{
-  flex:1;
-  position:relative;
-  min-height:0;
-}
-.map-wrap{
-  width:100%;
-  height:100%;
-  position:relative;
-}
-.map-full-container::before{
-  content:"";
-  position:absolute;
-  left:0;right:0;bottom:0;
-  height:72px;
-  z-index:5;
-  pointer-events:none;
-  background:
-    radial-gradient(
-      ellipse at 50% 100%,
-      rgba(8,20,46,0.72) 0%,
-      rgba(14,34,76,0.35) 45%,
-      rgba(8,20,46,0.12) 75%,
-      transparent 100%
-    );
-}
-.map-full-container::after{
-  content:"";
-  position:absolute;
-  left:0;right:0;bottom:62px;
-  height:1px;
-  z-index:6;
-  pointer-events:none;
-  background:linear-gradient(90deg,transparent 0%,rgba(79,195,247,0.25)20%,rgba(79,195,247,0.5)50%,rgba(79,195,247,0.25)80%,transparent 100%);
-  box-shadow:0 0 10px rgba(79,195,247,0.45);
-}
-.bottom-tool-bar{
-  position:absolute;
-  bottom:18px;
-  left:50%;
-  transform:translateX(-50%);
-  z-index:8;
-  background:linear-gradient(180deg,rgba(14,34,76,0.78)0%,rgba(8,20,46,0.78)100%);
-  border:1px solid rgba(79,195,247,0.35);
-  border-radius:14px;
-  padding:10px 18px;
-  display:flex;
-  align-items:center;
-  gap:14px;
-  box-shadow:0 4px 18px rgba(0,0,0.45),inset 0 0 0 1px rgba(79,195,247,0.08),0 0 22px rgba(79,195,247,0.12);
-}
-.tool-group{
-  display:flex;
-  gap:8px;
-  align-items:center;
-}
-.divider{
-  width:1px;
-  height:28px;
-  background:#27416b;
-}
-.tool-select{
-  height:32px;
-  background:#0a1728;
-  border:1px solid rgba(79,195,247,0.25);
-  color:#d0e4ff;
-  border-radius:4px;
-  padding:0 8px;
-  font-size:13px;
-}
-.tool-btn{
-  height:32px;
-  padding:0 12px;
-  background:rgba(79,195,247,0.08);
-  border:1px solid rgba(79,195,247,0.25);
-  color:#d0e4ff;
-  border-radius:4px;
-  cursor:pointer;
-  font-size:13px;
-  white-space:nowrap;
-  transition:all .2s ease;
-}
-.tool-btn:hover{
-  background:rgba(79,195,247,0.22);
-  border-color:rgba(79,195,247,0.55);
-  box-shadow:0 0 14px rgba(79,195,247,0.3);
-}
-.route-panel{
-  position:absolute;
-  left:16px;
-  top:16px;
-  width:300px;
-  background:rgba(13,28,51,0.95);
-  border:1px solid rgba(79,195,247,0.32);
-  border-radius:6px;
-  padding:12px;
-  z-index:999;
-  box-shadow:0 4px 16px rgba(0,0,0,0.4);
-}
-.route-title{
-  font-size:14px;
-  color:#4fc3f7;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:10px;
-}
-.close-btn{
-  cursor:pointer;
-  font-size:18px;
-  color:#9db8dd;
-}
-.close-btn:hover{color:#fff;}
-.route-form-item{
-  margin-bottom:8px;
-}
-.route-form-item label{
-  display:block;
-  font-size:12px;
-  color:#9db8dd;
-  margin-bottom:4px;
-}
-.route-input{
-  width:100%;
-  height:30px;
-  background:#0a1728;
-  border:1px solid #27416b;
-  color:#d0e4ff;
-  border-radius:4px;
-  padding:0 8px;
-}
-.route-tip{
-  font-size:12px;
-  color:#ffd54f;
-  line-height:1.5;
-  margin:8px 0;
-  min-height:32px;
-}
-.route-btn-row{
-  display:flex;
-  gap:8px;
-}
-.route-btn{ height:30px; }
-.btn-primary,.btn-gray{
-  flex:1;
-  height:30px;
-  border-radius:4px;
-  border:none;
-  cursor:pointer;
-  font-size:13px;
-}
-.btn-primary{
-  background:#1e88e5;
-  color:#fff;
-}
-.btn-primary:hover{background:#2196f3;}
-.btn-gray{
-  background:#2a3d5c;
-  color:#d0e4ff;
-}
-.btn-gray:hover{background:#35496b;}
-.aside-right{
-  position:absolute;
-  top:16px;
-  right:16px;
-  width:300px;
-  background:linear-gradient(180deg,rgba(17,38,76,0.94)0%,rgba(10,24,52,0.94)100%);
-  border:1px solid rgba(79,195,247,0.32);
-  border-radius:12px;
-  padding:14px;
-  overflow-y:auto;
-  max-height:calc(100% - 110px);
-  z-index:997;
-  box-shadow:0 4px 18px rgba(0,0,0.45),0 0 22px rgba(79,195,247,0.12);
-}
-.stat-card{
-  background:rgba(255,255,255,0.03);
-  border:1px solid #27416b;
-  border-radius:6px;
-  padding:12px;
-  margin-bottom:14px;
-}
-.card-title{
-  font-size:14px;
-  color:#4fc3f7;
-  border-left:3px solid #4fc3f7;
-  padding-left:8px;
-  margin-bottom:10px;
-}
-#chartBox{ width:100%; height:200px; }
-#chartType{ width:100%; height:240px; }
-.modal{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.5);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:2000;
-}
-.modal-content{
-  width:440px;
-  background:#0d1c33;
-  border:1px solid #27416b;
-  border-radius:6px;
-  padding:20px;
-}
-.modal-content h4{
-  color:#4fc3f7;
-  margin-bottom:14px;
-}
-.form-item-modal{
-  margin-bottom:12px;
-  display:flex;
-  flex-direction:column;
-  gap:5px;
-}
-.form-item-modal label{
-  font-size:13px;
-  color:#b8d4ff;
-}
-.form-item-modal input{
-  width:100%;
-  height:34px;
-  background:#0a1728;
-  border:1px solid #27416b;
-  color:#d0e4ff;
-  border-radius:4px;
-  padding:0 10px;
-}
-.site-tip-text{
-  white-space:pre-line;
-  font-size:13px;
-  color:#9db8dd;
-  margin:14px 0;
-  line-height:1.7;
-  background:rgba(79,195,247,0.06);
-  padding:10px;
-  border-radius:4px;
-}
-.modal-buttons{
-  display:flex;
-  gap:10px;
-}
-</style>
-<style>
-.info-win-root{
-  position:relative;
-  min-width:345px;
-  max-width:375px;
-  background:#0d1c33;
-  border-radius:12px;
-  border:1px solid #2c5488;
-  padding:18px;
-  box-shadow:0 8px 26px rgba(0,0,0,0.70);
-}
-.win-close{
-  position:absolute;
-  top:10px;
-  right:14px;
-  font-size:22px;
-  color:#89a3c7;
-  cursor:pointer;
-  z-index:10;
-}
-.win-title{
-  color:#52b8f7;
-  margin:0 0 12px 0;
-  font-size:17px;
-  padding-right:24px;
-}
-.win-row{
-  margin:6px 0;
-  font-size:14px;
-  color:#b3e5fc;
-}
-.win-btn-group{
-  display:flex;
-  gap:10px;
-  margin:14px 0;
-}
-.win-btn-group button{
-  flex:1;
-  padding:8px 0;
-  background:rgba(30,136,229,0.18);
-  border:1px solid #2e5080;
-  color:#d0e4ff;
-  border-radius:6px;
-  cursor:pointer;
-  font-size:14px;
-}
-.ta-comment{
-  width:100%;
-  background:#0a1728;
-  border:1px solid #27416b;
-  color:#d0e4ff;
-  border-radius:6px;
-  padding:9px;
-  min-height:70px;
-  resize:vertical;
-  box-sizing:border-box;
-  font-size:14px;
-}
-.win-submit-row{
-  display:flex;
-  gap:10px;
-  margin-top:10px;
-  align-items:center;
-}
-.sel-star{
-  width:110px;
-  height:34px;
-  background:#0a1728;
-  border:1px solid #27416b;
-  color:#d0e4ff;
-  border-radius:4px;
-  padding-left:8px;
-  font-size:14px;
-}
-.btn-submit{
-  flex:1;
-  height:34px;
-  background:rgba(82,184,247,0.20);
-  border:1px solid #52b8f7;
-  color:#c7e6ff;
-  border-radius:6px;
-  cursor:pointer;
-}
-.comment-box{
-  margin-top:12px;
-  max-height:140px;
-  overflow-y:auto;
-}
-</style>
+<style src="./Home_style.css"></style>
