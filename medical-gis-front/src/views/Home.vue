@@ -228,7 +228,7 @@
           <button class="tool-btn" @click="openHeatDialog">🔥热力分析</button>
           <button class="tool-btn" @click="openResourceQuery">📋时空资源查询</button>
           <button class="tool-btn" @click="openAppoint">🏥预约挂号</button>
-          <button class="tool-btn" @click="toggleStatPanel">📊系统统计</button>
+          <button class="tool-btn" @click="toggleStatPanel">📈医疗资源态势</button>
           <button class="tool-btn" @click="toggleSitePanel">📍选址分析</button>
           <button class="tool-btn" @click="aiDialogVisible=true">🤖AI就医咨询</button>
         </div>
