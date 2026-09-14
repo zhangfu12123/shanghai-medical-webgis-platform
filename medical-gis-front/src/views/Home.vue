@@ -53,15 +53,8 @@
             <button class="btn-gray route-btn" @click="clearRouteDraw">清除路线</button>
           </div>
         </div>
-        <aside class="aside-right" v-show="statPanelVisible || sitePanelVisible || heatStatShow">
-          <div v-if="statPanelVisible" class="stat-card">
-            <div class="card-title">医疗机构统计</div>
-            <div id="chartBox"></div>
-          </div>
-          <div v-if="statPanelVisible" class="stat-card">
-            <div class="card-title">点位类型统计</div>
-            <div id="chartType"></div>
-          </div>
+        <aside class="aside-right" v-show="resiliencePanelVisible || sitePanelVisible || heatStatShow">
+          <MedicalResilience v-if="resiliencePanelVisible" :visible="resiliencePanelVisible" />
           <div v-if="heatStatShow" class="stat-card">
             <div class="card-title">🏘️居民区就医热力统计</div>
             <div class="win-row">居民区：{{heatStat.communityName}}</div>
@@ -228,7 +221,7 @@
           <button class="tool-btn" @click="openHeatDialog">🔥热力分析</button>
           <button class="tool-btn" @click="openResourceQuery">📋时空资源查询</button>
           <button class="tool-btn" @click="openAppoint">🏥预约挂号</button>
-          <button class="tool-btn" @click="toggleStatPanel">📈医疗资源态势</button>
+          <button class="tool-btn" @click="toggleResiliencePanel">💪医疗资源韧性评估</button>
           <button class="tool-btn" @click="toggleSitePanel">📍选址分析</button>
           <button class="tool-btn" @click="aiDialogVisible=true">🤖AI就医咨询</button>
         </div>
@@ -276,6 +269,7 @@ import MapContainer from '../components/MapContainer.vue'
 import AiChatDialog from '../components/AiChatDialog.vue'
 import SiteSelectionPanel from '../components/SiteSelectionPanel.vue'
 import HeatMapDialog from '../components/HeatMapDialog.vue'
+import MedicalResilience from '../components/MedicalResilience.vue'
 import request from '../api/request'
 import * as turf from '@turf/turf'
 import * as echarts from 'echarts'
@@ -285,8 +279,6 @@ const router = useRouter()
 const aiDialogVisible = ref(false)
 const aiChatRef = ref(null)
 let map = null
-let chartTotal = null
-let chartType = null
 let driving = null
 let autoStart = null
 let autoEnd = null
@@ -306,7 +298,7 @@ const siteNeedRefresh = ref(false)
 const isSiteSelectMode = ref(false)
 const allMedicalPoints = ref([])
 let siteBufferPolygon = null
-const statPanelVisible = ref(false)
+const resiliencePanelVisible = ref(false)
 const routePanelShow = ref(false)
 const routeClickTip = ref("🔵选择地点，生成路径")
 const route = ref({
@@ -721,7 +713,7 @@ function toggleSitePanel(){
     return
   }
   sitePanelVisible.value = !sitePanelVisible.value
-  statPanelVisible.value = false
+  resiliencePanelVisible.value = false
   heatStatShow.value = false
   if(sitePanelVisible.value){
     isSiteSelectMode.value = true
@@ -807,26 +799,12 @@ function closeSiteModal(){
   siteTip.value = ''
 }
 
-async function toggleStatPanel(){
-  statPanelVisible.value = !statPanelVisible.value
+function toggleResiliencePanel(){
+  resiliencePanelVisible.value = !resiliencePanelVisible.value
   sitePanelVisible.value = false
   heatStatShow.value = false
   isSiteSelectMode.value = false
   clearSiteBufferDraw()
-  if(statPanelVisible.value){
-    await nextTick()
-    refreshStat()
-  }
-}
-
-async function refreshStat(){
-  if(chartTotal){ chartTotal.dispose(); chartType.dispose() }
-  chartTotal = echarts.init(document.getElementById('chartBox'),'dark')
-  chartType = echarts.init(document.getElementById('chartType'),'dark')
-  const resTotal = await request.get('/stat/countAll')
-  const resType = await request.get('/stat/countByType')
-  chartTotal.setOption({tooltip:{},series:[{type:'gauge',data:[{value:resTotal.data.total,name:'机构总数'}]}]})
-  chartType.setOption({tooltip:{trigger:'axis'},xAxis:{data:resType.data.map(i=>i.type)},yAxis:{},series:[{type:'bar',data:resType.data.map(i=>i.cnt)}]})
 }
 
 function initRoutePlugins(){
@@ -1222,8 +1200,6 @@ onUnmounted(()=>{
     currentInfoWin.close()
     currentInfoWin = null
   }
-  chartTotal?.dispose()
-  chartType?.dispose()
   if(driving) driving.clear()
   driving = null
   geocoder = null
