@@ -226,6 +226,10 @@
               v-if="resourceMenuShow"
               @click.stop
             >
+              <div class="res-menu-item" @click="openMedicalStaff">
+                <span>👨‍⚕️</span>
+                <b>医疗信息库</b>
+              </div>
               <div class="res-menu-item" @click="openDrugDatabase">
                 <span>💊</span>
                 <b>药品数据库</b>
@@ -598,6 +602,10 @@ function toggleResourceMenu(){
   resourceMenuShow.value = !resourceMenuShow.value
 }
 function closeResourceMenu(){ resourceMenuShow.value = false }
+function openMedicalStaff(){
+  resourceMenuShow.value = false
+  router.push('/medical-staff-query')
+}
 function openDrugDatabase(){
   resourceMenuShow.value = false
   router.push('/drug-database')

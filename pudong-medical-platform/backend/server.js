@@ -20,6 +20,7 @@ const siteApi = require('./routes/siteApi')
 const communityApi = require('./routes/communityApi')
 const resilienceApi = require('./routes/resilienceApi')
 const drugApi = require('./routes/drugApi')
+const medicalStaffApi = require('./routes/medicalStaffApi')
 const app = express()
 const PORT = 3000
 app.use(cors())
@@ -55,6 +56,7 @@ app.use('/api/site', siteApi)
 app.use('/api/community',communityApi)
 app.use('/api/resilience', resilienceApi)
 app.use('/api/drug', drugApi)
+app.use('/api/staff', medicalStaffApi)
 //全局错误捕获
 app.use((err, req, res, next) => {
     console.error(err)

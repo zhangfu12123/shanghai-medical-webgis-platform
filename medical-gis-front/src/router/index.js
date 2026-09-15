@@ -7,6 +7,7 @@ import Notice from '../views/Notice.vue'
 import NoticeAdmin from '../views/NoticeAdmin.vue'
 import Personal from '../views/Personal.vue'
 import DrugDatabase from '../views/DrugDatabase.vue'
+import MedicalStaffQuery from '../views/MedicalStaffQuery.vue'
 
 const routes = [
   { path: '/', redirect: '/home' },
@@ -51,6 +52,12 @@ const routes = [
     name: 'DrugDatabase',
     component: DrugDatabase,
     meta: { title: '药品数据库', requireAuth: true }
+  },
+  {
+    path: '/medical-staff-query',
+    name: 'MedicalStaffQuery',
+    component: MedicalStaffQuery,
+    meta: { title: '医护人员查询', requireAuth: true }
   }
 ]
 
