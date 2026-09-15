@@ -8,6 +8,7 @@ import NoticeAdmin from '../views/NoticeAdmin.vue'
 import Personal from '../views/Personal.vue'
 import DrugDatabase from '../views/DrugDatabase.vue'
 import MedicalStaffQuery from '../views/MedicalStaffQuery.vue'
+import HealthManagement from '../views/HealthManagement.vue'
 
 const routes = [
   { path: '/', redirect: '/home' },
@@ -58,6 +59,12 @@ const routes = [
     name: 'MedicalStaffQuery',
     component: MedicalStaffQuery,
     meta: { title: '医护人员查询', requireAuth: true }
+  },
+  {
+    path: '/health-management',
+    name: 'HealthManagement',
+    component: HealthManagement,
+    meta: { title: '健康管理', requireAuth: true }
   }
 ]
 

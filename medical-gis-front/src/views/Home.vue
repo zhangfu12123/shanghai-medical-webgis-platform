@@ -236,7 +236,7 @@
               </div>
             </div>
           </div>
-          <button class="tool-btn" @click="openAppoint">🏥预约挂号</button>
+          <button class="tool-btn" @click="openHealthManage">❤️健康管理</button>
           <button class="tool-btn" @click="toggleResiliencePanel">💪医疗资源韧性评估</button>
           <button class="tool-btn" @click="toggleSitePanel">📍选址分析</button>
           <button class="tool-btn" @click="aiDialogVisible=true">🤖AI就医咨询</button>
@@ -610,7 +610,9 @@ function openDrugDatabase(){
   resourceMenuShow.value = false
   router.push('/drug-database')
 }
-function openAppoint(){}
+function openHealthManage(){
+  router.push('/health-management')
+}
 function fillRouteByPoint(name,lng,lat){
   const lnglatObj = new window.AMap.LngLat(lng,lat)
   if(!route.value.startLngLat){
