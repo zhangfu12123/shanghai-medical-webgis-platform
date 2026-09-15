@@ -6,6 +6,7 @@ import Register from '../views/Register.vue'
 import Notice from '../views/Notice.vue'
 import NoticeAdmin from '../views/NoticeAdmin.vue'
 import Personal from '../views/Personal.vue'
+import DrugDatabase from '../views/DrugDatabase.vue'
 
 const routes = [
   { path: '/', redirect: '/home' },
@@ -44,6 +45,12 @@ const routes = [
     name: 'Personal',
     component: Personal,
     meta: { title: '个人中心', requireAuth: true }
+  },
+  {
+    path: '/drug-database',
+    name: 'DrugDatabase',
+    component: DrugDatabase,
+    meta: { title: '药品数据库', requireAuth: true }
   }
 ]
 

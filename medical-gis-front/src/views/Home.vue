@@ -219,7 +219,19 @@
         <div class="tool-group">
           <button class="tool-btn" @click="openRoutePanel">🚗路径规划</button>
           <button class="tool-btn" @click="openHeatDialog">🔥热力分析</button>
-          <button class="tool-btn" @click="openResourceQuery">📋时空资源查询</button>
+          <div class="res-query-wrap">
+            <button class="tool-btn" @click.stop="toggleResourceMenu">📚资源查询</button>
+            <div
+              class="res-query-menu"
+              v-if="resourceMenuShow"
+              @click.stop
+            >
+              <div class="res-menu-item" @click="openDrugDatabase">
+                <span>💊</span>
+                <b>药品数据库</b>
+              </div>
+            </div>
+          </div>
           <button class="tool-btn" @click="openAppoint">🏥预约挂号</button>
           <button class="tool-btn" @click="toggleResiliencePanel">💪医疗资源韧性评估</button>
           <button class="tool-btn" @click="toggleSitePanel">📍选址分析</button>
@@ -581,7 +593,15 @@ function onHeatStatUpdate(res){
   heatStat.value = res
   heatStatShow.value = true
 }
-function openResourceQuery(){}
+const resourceMenuShow = ref(false)
+function toggleResourceMenu(){
+  resourceMenuShow.value = !resourceMenuShow.value
+}
+function closeResourceMenu(){ resourceMenuShow.value = false }
+function openDrugDatabase(){
+  resourceMenuShow.value = false
+  router.push('/drug-database')
+}
 function openAppoint(){}
 function fillRouteByPoint(name,lng,lat){
   const lnglatObj = new window.AMap.LngLat(lng,lat)
@@ -603,6 +623,7 @@ function showToast(msg,type='success'){
 }
 
 onMounted(async ()=>{
+  document.addEventListener('click', closeResourceMenu)
   try{
     const resType = await request.get('/stat/countByType')
     medicalTypeList.value = resType.data
@@ -1181,6 +1202,7 @@ offset: new window.AMap.Pixel(-7, -18),
 }
 
 onUnmounted(()=>{
+  document.removeEventListener('click', closeResourceMenu)
   clearSiteBufferDraw()
   if(liveDashboardTimer) clearInterval(liveDashboardTimer)
   if(livePoiSearchTimer) clearInterval(livePoiSearchTimer)
@@ -1207,3 +1229,49 @@ onUnmounted(()=>{
 })
 </script>
 <style src="./Home_style.css"></style>
+
+<style scoped>
+.res-query-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.res-query-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+  background: rgba(14, 28, 52, 0.97);
+  border: 1px solid rgba(79, 195, 247, 0.35);
+  border-radius: 6px;
+  padding: 3px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+.res-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.res-menu-item:hover {
+  background: rgba(79, 195, 247, 0.16);
+}
+.res-menu-item > span {
+  font-size: 14px;
+}
+.res-menu-item b {
+  font-size: 12px;
+  color: #e6f7ff;
+}
+.res-menu-item small {
+  font-size: 10px;
+  color: #7fb6d8;
+}
+</style>
