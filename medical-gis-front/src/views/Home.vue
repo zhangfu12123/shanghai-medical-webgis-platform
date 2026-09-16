@@ -53,22 +53,56 @@
             <button class="btn-gray route-btn" @click="clearRouteDraw">清除路线</button>
           </div>
         </div>
-        <aside class="aside-right" v-show="resiliencePanelVisible || sitePanelVisible || heatStatShow">
+        <aside class="aside-right" v-show="resiliencePanelVisible">
           <MedicalResilience v-if="resiliencePanelVisible" :visible="resiliencePanelVisible" />
+        </aside>
+
+        <div class="result-rail" v-show="heatStatShow || sitePanelVisible">
           <div v-if="heatStatShow" class="stat-card">
-            <div class="card-title">🏘️居民区就医热力统计</div>
-            <div class="win-row">居民区：{{heatStat.communityName}}</div>
-            <div class="win-row">分析半径：{{heatStat.radiusM}} 米</div>
-            <div class="win-row">医疗点位数量：{{heatStat.medicalCount}}</div>
-            <div class="win-row">可达评估：{{heatStat.level}}</div>
-            <div class="win-row" style="color:#ffe082">建议：{{heatStat.suggest}}</div>
+            <div class="side-head">
+              <div>
+                <span class="side-kicker">RESIDENTIAL MEDICAL</span>
+                <strong>居民区就医热力统计</strong>
+              </div>
+              <span class="side-index">01</span>
+            </div>
+
+            <div class="stat-metric-list">
+              <div class="hud-metric">
+                <span class="metric-label">居民区 · COMMUNITY</span>
+                <strong>{{ heatStat.communityName }}</strong>
+              </div>
+              <div class="hud-metric">
+                <span class="metric-label">分析半径 · RADIUS</span>
+                <strong>{{ heatStat.radiusM }} 米</strong>
+              </div>
+              <div class="hud-metric">
+                <span class="metric-label">医疗点位 · POINTS</span>
+                <strong>{{ heatStat.medicalCount }} 个</strong>
+              </div>
+            </div>
+
+            <div class="stat-section">
+              <div class="side-section-title"><i></i>可达评估</div>
+              <div class="traffic-state">
+                <span class="traffic-light"></span>
+                <div>
+                  <b>{{ heatStat.level }}</b>
+                </div>
+              </div>
+            </div>
+
+            <div class="stat-section">
+              <div class="side-section-title"><i></i>分析建议</div>
+              <p class="stat-suggest-text">{{ heatStat.suggest }}</p>
+            </div>
           </div>
           <SiteSelectionPanel
             v-if="sitePanelVisible"
             :trigger-refresh="siteNeedRefresh"
             @locate-map="handleSiteLocate"
           />
-        </aside>
+        </div>
         <div class="hud-left-rail">
           <div class="side-head">
             <div>
@@ -291,6 +325,7 @@ import * as turf from '@turf/turf'
 import * as echarts from 'echarts'
 import {getUserInfo,clearStorage} from '../utils/storage'
 import {buildPointPopupHtml, bindPopupDomEvent} from '../utils/popupHelper'
+import './Home_style.css'
 const router = useRouter()
 const aiDialogVisible = ref(false)
 const aiChatRef = ref(null)
@@ -1238,8 +1273,6 @@ onUnmounted(()=>{
   placeSearch = null
 })
 </script>
-<style src="./Home_style.css"></style>
-
 <style scoped>
 .res-query-wrap {
   position: relative;
@@ -1283,5 +1316,36 @@ onUnmounted(()=>{
 .res-menu-item small {
   font-size: 10px;
   color: #7fb6d8;
+}
+
+/* ===== 窄面板：统计 / 选址套用「城市运行监测」同款指挥面板样式 ===== */
+.stat-card {
+  background: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+}
+
+.stat-metric-list { margin-top: 6px; }
+.stat-metric-list .hud-metric { margin-top: 0; }
+.stat-metric-list .hud-metric:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.stat-section {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(79,195,247,.11);
+}
+
+.stat-suggest-text {
+  margin: 0;
+  color: #a9c4e4;
+  font-size: 10px;
+  line-height: 1.7;
 }
 </style>
