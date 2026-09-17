@@ -26,7 +26,7 @@
           <span class="side-logo-icon">🏥</span>
           <div>
             <b>药品中心</b>
-            <small>返回药品目录</small>
+            <small>药品详细查询</small>
           </div>
         </div>
         <nav class="side-menu">
@@ -53,6 +53,14 @@
           >
             <span class="mi-icon">📖</span>
             <div><b>用药指南</b><small>合理用药 · 就近就医</small></div>
+          </div>
+          <div
+            class="menu-item"
+            :class="{ active: activeTab === 'smart' }"
+            @click="switchTab('smart')"
+          >
+            <span class="mi-icon">🩺</span>
+            <div><b>智能荐药</b><small>症状自查 · 安全推荐</small></div>
           </div>
         </nav>
         <div class="side-foot">浦东新区公共医疗资源服务平台</div>
@@ -315,6 +323,158 @@
             </div>
           </template>
         </section>
+
+        <!-- ============ 智能荐药（创新功能） ============ -->
+        <section v-else-if="activeTab === 'smart'" class="func-view">
+          <div class="func-title">
+            <h2>🩺 智能荐药</h2>
+            <small>根据您的症状和个人情况，智能推荐安全适用的药品，自动排除禁忌药品</small>
+          </div>
+
+          <!-- 症状选择 + 用户信息 -->
+          <div class="smart-input-panel">
+            <div class="smart-step">
+              <div class="smart-step-head">
+                <span class="step-num">1</span>
+                <b>选择您的症状（可多选）</b>
+                <button
+                  type="button"
+                  class="symptom-clear-btn"
+                  :disabled="!selectedSymptoms.length"
+                  @click="clearSymptoms"
+                >清除所选</button>
+              </div>
+              <div class="symptom-grid">
+                <label class="symptom-chip" v-for="s in symptomList" :key="s" :class="{ on: selectedSymptoms.includes(s) }">
+                  <input type="checkbox" :value="s" v-model="selectedSymptoms" />{{ s }}
+                </label>
+              </div>
+              <div class="symptom-desc-area">
+                <label>症状描述</label>
+                <textarea
+                  v-model="symptomDesc"
+                  rows="3"
+                  placeholder=""
+                ></textarea>
+                <p class="desc-hint" v-if="selectedSymptoms.length">
+                </p>
+              </div>
+            </div>
+
+            <div class="smart-step">
+              <div class="smart-step-head">
+                <span class="step-num">2</span>
+                <b>填写个人情况</b>
+              </div>
+              <div class="smart-profile-row">
+                <div class="profile-item">
+                  <label>年龄</label>
+                  <input type="number" v-model="userProfile.age" min="0" max="120" placeholder="" />
+                </div>
+                <div class="profile-item">
+                  <label>性别</label>
+                  <select v-model="userProfile.gender">
+                    <option value="">不透露</option>
+                    <option value="男">男</option>
+                    <option value="女">女</option>
+                  </select>
+                </div>
+                <div class="profile-item">
+                  <label>是否孕期/哺乳期</label>
+                  <select v-model="userProfile.isPregnant">
+                    <option :value="false">否</option>
+                    <option :value="true">是</option>
+                  </select>
+                </div>
+              </div>
+              <div class="smart-profile-row">
+                <div class="profile-item profile-allergy">
+                  <label>过敏史（选填，AI 将智能甄别交叉过敏风险）</label>
+                  <input v-model="userProfile.allergies" placeholder="" />
+                </div>
+              </div>
+            </div>
+
+            <div class="smart-action">
+              <button class="smart-rec-btn" @click="doRecommend" :disabled="recLoading">
+                {{ recLoading ? '🤖 AI 正在分析过敏风险…' : '🔍 开始智能荐药' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 推荐结果 -->
+          <div class="smart-result" v-if="recResult">
+            <!-- AI 分析标识 -->
+            <div class="ai-badge" v-if="recResult.aiUsed">
+              <span class="ai-badge-icon">🤖</span>
+              <span>本次过敏分析由 AI 智能甄别，已交叉比对药物成分类别与您的过敏史</span>
+            </div>
+
+            <div class="triage-banner" :class="recResult.triage.level">
+              <div class="triage-icon">
+                <span v-if="recResult.triage.level === 'safe'">✅</span>
+                <span v-else-if="recResult.triage.level === 'caution'">⚠️</span>
+                <span v-else-if="recResult.triage.level === 'warning'">📋</span>
+                <span v-else>🚨</span>
+              </div>
+              <div class="triage-body">
+                <b>{{ recResult.triage.title }}</b>
+                <p>{{ recResult.triage.message }}</p>
+              </div>
+              <div class="triage-badge" v-if="recResult.triage.needDoctor">建议就医</div>
+            </div>
+
+            <div class="match-cats" v-if="recResult.matchedCategories.length">
+              <span class="match-label">匹配分类：</span>
+              <span class="match-cat-tag" v-for="c in recResult.matchedCategories" :key="c">{{ c }}</span>
+            </div>
+
+            <div class="rec-drug-section" v-if="recResult.recommended.length">
+              <h3>✅ 推荐药品（{{ recResult.recommended.length }} 种）</h3>
+              <div class="rec-drug-grid">
+                <div class="rec-drug-card" v-for="d in recResult.recommended" :key="d.id" @click="openDetail(d.id)">
+                  <div class="rec-drug-top">
+                    <h4>{{ d.name }}</h4>
+                    <span class="rx" :class="d.prescription === '处方药' ? 'rx-e' : 'rx-o'">{{ d.prescription || '—' }}</span>
+                  </div>
+                  <div class="rec-drug-meta">
+                    <span class="tag tag-blue">{{ d.category || '未分类' }}</span>
+                    <span>{{ d.dosage_form || '—' }}</span>
+                    <span class="spec">{{ d.spec || '—' }}</span>
+                  </div>
+                  <p class="rec-usage" v-if="d.usage_dosage">{{ d.usage_dosage }}</p>
+                  <div class="rec-ai-safe" v-if="d.aiReason">
+                    <span class="ai-reason-icon">🤖</span>{{ d.aiReason }}
+                  </div>
+                  <b class="rec-detail-link">查看详情 →</b>
+                </div>
+              </div>
+            </div>
+
+            <div class="rec-excluded-section" v-if="recResult.excluded.length">
+              <h3>🚫 已排除药品（{{ recResult.excluded.length }} 种，存在禁忌）</h3>
+              <div class="excluded-list">
+                <div class="excluded-item" v-for="d in recResult.excluded" :key="d.id">
+                  <div class="excluded-name">
+                    <b>{{ d.name }}</b>
+                    <span class="rx" :class="d.prescription === '处方药' ? 'rx-e' : 'rx-o'">{{ d.prescription || '—' }}</span>
+                  </div>
+                  <div class="excluded-warns">
+                    <span class="warn-tag" v-for="w in d.warnings" :key="w">{{ w }}</span>
+                  </div>
+                  <div class="excluded-ai-reason" v-if="d.aiReason">
+                    <span class="ai-reason-icon">🤖</span>{{ d.aiReason }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="rec-empty" v-if="!recResult.recommended.length && !recResult.excluded.length">
+              <div class="rec-empty-icon">🔍</div>
+              <p>未找到匹配的药品，请尝试选择其他症状或就医咨询</p>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -323,7 +483,7 @@
       <div class="modal-card">
         <div class="modal-icon">🗑</div>
         <h3 class="modal-title">删除药品</h3>
-        <p class="modal-text">确定删除「{{ delConfirm.drug && delConfirm.drug.name }}」吗？<br/>删除后数据库中将同步移除，不可恢复。</p>
+        <p class="modal-text">确定删除「{{ delConfirm.drug && delConfirm.drug.name }}」吗？<br/></p>
         <div class="modal-actions">
           <button class="btn-gray btn-sm" @click="closeDelConfirm">取消</button>
           <button class="btn-danger btn-sm" @click="confirmDelete" :disabled="delConfirm.loading">
@@ -339,7 +499,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, nextTick, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '../api/request'
 
@@ -410,6 +570,7 @@ async function switchTab(tab) {
     scrollToHighlightIfNeeded()
   }
   if (tab === 'guide') loadGuides()
+  if (tab === 'smart') { /* 无需预加载 */ }
 }
 
 async function loadList(page = 1) {
@@ -435,9 +596,14 @@ function doSearch() {
   loadList(1)
 }
 
+function clearSymptoms() {
+  selectedSymptoms.value = []
+}
+
 async function openDetail(id) {
   try {
     const res = await request.get(`/drug/detail/${id}`)
+    activeTab.value = 'list'     // 从智能荐药等标签跳转到药品详情视图
     detailDrug.value = res.data
   } catch (e) {
     console.error('加载药品详情失败', e)
@@ -603,6 +769,82 @@ async function openGuide(id) {
   }
 }
 
+// ==================== 创新功能：智能荐药 ====================
+const symptomList = [
+  '头痛', '发热', '牙痛', '痛经', '肌肉酸痛', '关节疼痛',
+  '咳嗽', '感冒', '咽痛', '鼻塞', '流涕',
+  '腹泻', '胃痛', '消化不良', '胃酸过多', '恶心呕吐',
+  '过敏', '皮疹', '荨麻疹', '鼻炎',
+  '皮肤感染', '外伤',
+  '高血压', '心绞痛', '心悸',
+  '糖尿病', '失眠', '焦虑',
+  '维生素缺乏', '骨质疏松', '哮喘',
+  '便秘', '痔疮', '湿疹', '皮炎', '头晕', '痛风',
+]
+const selectedSymptoms = ref([])
+const symptomDesc = ref('')   // 症状描述框内容 = 自动填入的症状 + 用户补充文字
+const autoPart = ref('')      // 记录当前已自动填入的症状文字，用于下次更新时剥离
+
+// 点选症状 → 自动把症状文字填到描述框；用户手写的补充文字不丢失
+watch(selectedSymptoms, (newVals) => {
+  const autoText = newVals.join('、')
+
+  // 从当前描述里剥离上次自动填入的部分，剩下的就是用户自己补充的文字
+  let userText = symptomDesc.value || ''
+  const prevAuto = autoPart.value
+  if (prevAuto) {
+    const idx = userText.indexOf(prevAuto)
+    if (idx !== -1) {
+      userText = (userText.slice(0, idx) + userText.slice(idx + prevAuto.length))
+        .replace(/^[\s,，、；;]*(?:\n)?/, '')
+        .trim()
+    }
+  }
+  autoPart.value = autoText
+
+  // 重新拼接：自动填充部分 + 用户补充部分
+  if (autoText && userText) {
+    symptomDesc.value = autoText + '\n' + userText
+  } else if (autoText) {
+    symptomDesc.value = autoText
+  } else {
+    symptomDesc.value = userText
+  }
+}, { deep: true })
+const userProfile = reactive({ age: '', gender: '', isPregnant: false, allergies: '' })
+const recResult = ref(null)
+const recLoading = ref(false)
+
+async function doRecommend() {
+  if (!selectedSymptoms.value.length && !symptomDesc.value.trim()) {
+    showToast('请至少选择一项症状或描述您的症状', 'error')
+    return
+  }
+  recLoading.value = true
+  recResult.value = null
+  try {
+    const params = new URLSearchParams({
+      symptoms: selectedSymptoms.value.join(','),
+      symptomDesc: symptomDesc.value || '',
+      age: userProfile.age || '0',
+      gender: userProfile.gender || '',
+      isPregnant: userProfile.isPregnant ? '1' : '0',
+      allergies: userProfile.allergies || '',
+    })
+    const res = await request.get(`/drug/recommend?${params.toString()}`, { timeout: 30000 })
+    if (res.code === 200 && res.data) {
+      recResult.value = res.data
+    } else {
+      showToast(res.msg || '推荐失败', 'error')
+    }
+  } catch (e) {
+    console.error('智能荐药失败', e)
+    showToast('推荐失败，请稍后重试', 'error')
+  } finally {
+    recLoading.value = false
+  }
+}
+
 onMounted(() => {
   loadMyAddedIds()
   loadList(1)
@@ -723,7 +965,8 @@ onMounted(() => {
 .modal-icon { font-size: 30px; }
 .modal-title { margin: 10px 0 8px; font-size: 17px; color: #11294a; }
 .modal-text { font-size: 13px; color: #5b6e86; line-height: 1.7; margin: 0 0 20px; }
-.modal-actions { display: flex; gap: 12px; justify-content: center; }
+.modal-actions { display: flex; flex-direction: column; gap: 10px; }
+.modal-actions button { width: 100%; }
 .btn-sm { padding: 9px 20px; font-size: 13px; border-radius: 8px; cursor: pointer; border: none; font-weight: 600; }
 .btn-danger { background: #d32f2f; color: #fff; }
 .btn-danger:hover { background: #b71c1c; }
@@ -875,6 +1118,106 @@ onMounted(() => {
 .guide-detail-card h2 { margin: 14px 0; font-size: 22px; color: #11294a; }
 .guide-content { white-space: pre-line; line-height: 2; color: #4a5b70; font-size: 15px; }
 
+/* ==================== 创新功能：智能荐药 ==================== */
+
+/* 输入面板 */
+.smart-input-panel { background: #fff; border-radius: 16px; padding: 28px; box-shadow: 0 2px 8px rgba(20,50,90,0.05); margin-bottom: 20px; }
+.smart-step { margin-bottom: 24px; }
+.smart-step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.step-num { width: 26px; height: 26px; border-radius: 50%; background: #1976d2; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.smart-step-head b { font-size: 15px; color: #24344d; }
+.symptom-clear-btn { margin-left: auto; padding: 5px 14px; border: 1px solid #d8e3ef; border-radius: 8px; background: #f8fafd; color: #5b6e86; font-size: 13px; cursor: pointer; transition: all .2s; white-space: nowrap; }
+.symptom-clear-btn:hover:not(:disabled) { border-color: #ef5350; color: #d32f2f; background: #fff5f5; }
+.symptom-clear-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.symptom-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.symptom-chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border: 1px solid #d8e3ef; border-radius: 20px; font-size: 14px; color: #5b6e86; cursor: pointer; transition: all .2s; background: #fff; }
+.symptom-chip input { display: none; }
+.symptom-chip:hover { border-color: #90caf9; background: #f5f9ff; }
+.symptom-chip.on { background: linear-gradient(135deg, #1976d2, #1565c0); color: #fff; border-color: #1565c0; box-shadow: 0 2px 8px rgba(25,118,210,0.25); }
+
+.symptom-desc-area { margin-top: 14px; }
+.symptom-desc-area label { display: block; font-size: 13px; color: #5b6e86; margin-bottom: 6px; }
+.symptom-desc-area textarea {
+  width: 100%; padding: 11px 14px; border: 1px solid #d8e3ef; border-radius: 10px;
+  font-size: 14px; font-family: inherit; color: #33475b; background: #fff; resize: vertical;
+  line-height: 1.6;
+}
+.symptom-desc-area textarea:focus {
+  outline: none; border-color: #1976d2; box-shadow: 0 0 0 3px rgba(25,118,210,0.12);
+}
+.desc-hint {
+  margin: 8px 0 0; font-size: 12px; color: #1e8e3e; line-height: 1.6;
+}
+
+.smart-profile-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.profile-item { flex: 1; min-width: 160px; }
+.profile-item.profile-allergy { flex: 0 0 100%; min-width: 100%; }
+.profile-item label { display: block; font-size: 13px; color: #5b6e86; margin-bottom: 6px; }
+.profile-item input, .profile-item select { width: 100%; padding: 10px 12px; border: 1px solid #d8e3ef; border-radius: 10px; font-size: 14px; background: #fff; color: #33475b; }
+.profile-item input:focus, .profile-item select:focus { outline: none; border-color: #1976d2; box-shadow: 0 0 0 3px rgba(25,118,210,0.12); }
+
+.smart-action { margin-top: 8px; text-align: center; }
+.smart-rec-btn { background: linear-gradient(135deg, #1976d2, #1565c0); color: #fff; border: none; padding: 14px 44px; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 14px rgba(25,118,210,0.3); transition: all .2s; }
+.smart-rec-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(25,118,210,0.4); }
+.smart-rec-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+.smart-result { background: #fff; border-radius: 16px; padding: 28px; box-shadow: 0 2px 8px rgba(20,50,90,0.05); }
+
+.triage-banner { display: flex; align-items: center; gap: 16px; padding: 18px 20px; border-radius: 12px; margin-bottom: 20px; }
+.triage-banner.safe { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.triage-banner.caution { background: #fffbeb; border: 1px solid #fde68a; }
+.triage-banner.warning { background: #fff7ed; border: 1px solid #fed7aa; }
+.triage-banner.danger { background: #fef2f2; border: 1px solid #fecaca; }
+.triage-icon { font-size: 32px; flex-shrink: 0; }
+.triage-body b { display: block; font-size: 16px; color: #24344d; margin-bottom: 4px; }
+.triage-body p { margin: 0; font-size: 13px; color: #5b6e86; line-height: 1.6; }
+.triage-badge { flex-shrink: 0; background: #d32f2f; color: #fff; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 20px; white-space: nowrap; }
+
+.match-cats { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.match-label { font-size: 14px; color: #5b6e86; }
+.match-cat-tag { background: #e3f0ff; color: #1565c0; font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 20px; }
+
+.rec-drug-section h3, .rec-excluded-section h3 { font-size: 16px; color: #24344d; margin: 0 0 16px; }
+.rec-drug-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.rec-drug-card { background: #f8fafd; border: 1px solid #e8eef6; border-radius: 14px; padding: 18px; cursor: pointer; transition: all .2s; }
+.rec-drug-card:hover { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(20,80,160,0.1); border-color: #c6e0ff; }
+.rec-drug-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.rec-drug-top h4 { margin: 0; font-size: 17px; color: #11294a; }
+.rec-drug-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; color: #5b6e86; margin-bottom: 10px; }
+.rec-usage { margin: 0 0 10px; font-size: 13px; color: #6b7c92; line-height: 1.6; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rec-detail-link { font-size: 13px; color: #1565c0; }
+
+.rec-excluded-section { margin-top: 24px; }
+.excluded-list { display: flex; flex-direction: column; gap: 10px; }
+.excluded-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; background: #fff8f8; border: 1px solid #ffcdd2; border-radius: 12px; flex-wrap: wrap; }
+.excluded-name { display: flex; align-items: center; gap: 10px; }
+.excluded-name b { font-size: 15px; color: #24344d; }
+.excluded-warns { display: flex; gap: 8px; flex-wrap: wrap; }
+.warn-tag { background: #fee; color: #d32f2f; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; }
+
+.excluded-ai-reason, .rec-ai-safe {
+  margin-top: 8px; padding: 8px 12px; border-radius: 8px;
+  font-size: 13px; color: #33475b; line-height: 1.6;
+  display: flex; gap: 6px; align-items: flex-start;
+}
+.excluded-ai-reason { background: #fff3e0; border: 1px solid #ffe0b2; }
+.rec-ai-safe { background: #e8f5e9; border: 1px solid #c8e6c9; }
+.ai-reason-icon { flex-shrink: 0; }
+
+.ai-badge {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; margin-bottom: 20px;
+  background: linear-gradient(135deg, #f0f4ff, #e8f5e9);
+  border: 1px solid #c6e0ff; border-radius: 12px;
+  font-size: 13px; color: #24344d; line-height: 1.6;
+}
+.ai-badge-icon { font-size: 20px; flex-shrink: 0; }
+
+.rec-empty { text-align: center; padding: 40px 0; }
+.rec-empty-icon { font-size: 40px; margin-bottom: 12px; }
+.rec-empty p { color: #9aa8bb; font-size: 14px; }
+
 @media (max-width: 900px) {
   .drug-header { flex-direction: column; align-items: stretch; }
   .search-box { max-width: none; }
@@ -883,5 +1226,7 @@ onMounted(() => {
   .side-logo, .side-foot { display: none; }
   .menu-item { flex: 1; min-width: 140px; }
   .info-grid { grid-template-columns: repeat(2, 1fr); }
+  .rec-drug-grid { grid-template-columns: 1fr; }
+  .triage-banner { flex-direction: column; text-align: center; }
 }
 </style>
