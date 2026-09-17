@@ -1,11 +1,69 @@
 const express = require('express')
 const router = express.Router()
+const crypto = require('crypto')
 const { getPool, sql } = require('../db/db')
 
 /**
- * 医疗人员查询 / 排班 / 预约 后端接口
+ * 医疗人员查询 / 排班 / 预约 / 账号 / 额度 / 留言 后端接口
  * 挂载前缀建议：app.use('/api/staff', require('./routes/medicalStaffApi'))
  */
+
+// ============ 工具函数 ============
+const DEFAULT_QUOTA = 5
+const TIME_SLOTS = ['上午 08:30-11:30', '下午 13:30-16:30', '全天 08:00-16:30']
+
+function hashPassword(password, salt) {
+  return crypto.createHash('sha256').update(String(salt) + String(password)).digest('hex')
+}
+function randomSalt() {
+  return crypto.randomBytes(16).toString('hex')
+}
+
+// 把数据库层错误转成对用户友好的提示（尤其是指引先执行升级脚本建表）
+function friendlyDbError(prefix, err) {
+  const m = String((err && err.message) || err || '')
+  if (/user_account|doctor_slot_config|Invalid object|invalid object/i.test(m)) {
+    return prefix + '失败：相关数据表尚未创建，请先执行 staff_upgrade.sql 升级数据库表结构'
+  }
+  return prefix + '失败：' + m
+}
+
+// 获取医生某时段的额度（无配置则用默认值）
+async function getSlotQuota(doctorId, slot) {
+  const pool = getPool()
+  const reqDb = pool.request()
+  reqDb.input('doctor_id', sql.Int, doctorId)
+  reqDb.input('slot', sql.NVarChar(50), slot)
+  const rs = await reqDb.query(
+    'SELECT quota FROM dbo.doctor_slot_config WHERE doctor_id = @doctor_id AND slot = @slot'
+  )
+  if (rs.recordset.length > 0 && rs.recordset[0].quota != null) {
+    return parseInt(rs.recordset[0].quota)
+  }
+  return DEFAULT_QUOTA
+}
+
+// 统计某医生某日期某时段已预约（未取消）数量
+async function countBooked(doctorId, date, slot, excludeId = null) {
+  const pool = getPool()
+  const reqDb = pool.request()
+  reqDb.input('doctor_id', sql.Int, doctorId)
+  reqDb.input('date', sql.NVarChar(20), date)
+  reqDb.input('slot', sql.NVarChar(50), slot)
+  let extra = ''
+  if (excludeId) {
+    reqDb.input('exclude_id', sql.Int, excludeId)
+    extra = ' AND id <> @exclude_id'
+  }
+  const rs = await reqDb.query(`
+    SELECT COUNT(*) AS cnt FROM dbo.appointment
+    WHERE doctor_id = @doctor_id AND appoint_date = @date
+      AND time_slot = @slot AND status <> N'已取消'${extra}
+  `)
+  return parseInt(rs.recordset[0].cnt)
+}
+
+// ============ 医院 / 医生 ============
 
 // 医院列表
 router.get('/hospitals', async (req, res) => {
@@ -92,7 +150,9 @@ router.get('/schedule/:hospitalId', async (req, res) => {
   }
 })
 
-// 提交预约（含同医生同日期同时段占用校验）
+// ============ 预约（含额度校验） ============
+
+// 提交预约（按每天每时段额度校验，超出额度则拒绝）
 router.post('/appoint', async (req, res) => {
   try {
     const {
@@ -105,19 +165,12 @@ router.post('/appoint', async (req, res) => {
     }
     const pool = getPool()
 
-    // 占用校验：同医生 + 同日期 + 同时段，且状态未取消，视为冲突
+    // 额度校验：同医生 + 同日期 + 同时段，已约满则拒绝
     if (appoint_date && time_slot) {
-      const checkDb = pool.request()
-      checkDb.input('c_doctor_id', sql.Int, doctor_id)
-      checkDb.input('c_date', sql.NVarChar(20), appoint_date)
-      checkDb.input('c_slot', sql.NVarChar(50), time_slot)
-      const dup = await checkDb.query(`
-        SELECT TOP 1 id FROM dbo.appointment
-        WHERE doctor_id = @c_doctor_id AND appoint_date = @c_date
-          AND time_slot = @c_slot AND status <> N'已取消'
-      `)
-      if (dup.recordset.length > 0) {
-        return res.json({ code: 500, msg: '该医生在所选日期该时间段已被预约，请更换时间段' })
+      const quota = await getSlotQuota(doctor_id, time_slot)
+      const booked = await countBooked(doctor_id, appoint_date, time_slot)
+      if (booked >= quota) {
+        return res.json({ code: 500, msg: `该医生在所选日期该时间段预约已满，请更换时间段` })
       }
     }
 
@@ -151,24 +204,18 @@ router.post('/appoint', async (req, res) => {
   }
 })
 
-// 实时校验：某医生某日期某时间段是否已被占用
+// 实时校验：某医生某日期某时间段是否已约满（返回额度与剩余名额）
 router.get('/appoint/check', async (req, res) => {
   try {
     const { doctor_id, date, slot } = req.query
     if (!doctor_id || !date || !slot) {
       return res.json({ code: 200, data: { busy: false } })
     }
-    const pool = getPool()
-    const reqDb = pool.request()
-    reqDb.input('doctor_id', sql.Int, parseInt(doctor_id))
-    reqDb.input('date', sql.NVarChar(20), date)
-    reqDb.input('slot', sql.NVarChar(50), slot)
-    const rs = await reqDb.query(`
-      SELECT TOP 1 id FROM dbo.appointment
-      WHERE doctor_id = @doctor_id AND appoint_date = @date
-        AND time_slot = @slot AND status <> N'已取消'
-    `)
-    res.json({ code: 200, data: { busy: rs.recordset.length > 0 } })
+    const did = parseInt(doctor_id)
+    const quota = await getSlotQuota(did, slot)
+    const booked = await countBooked(did, date, slot)
+    const remaining = Math.max(0, quota - booked)
+    res.json({ code: 200, data: { busy: booked >= quota, quota, booked, remaining } })
   } catch (err) {
     console.error('【校验预约占用异常】', err)
     res.json({ code: 500, msg: '校验失败', error: err.message })
@@ -191,31 +238,54 @@ router.get('/appointments', async (req, res) => {
   }
 })
 
-// 编辑预约（含同医生同日期同时段占用校验，排除自身记录）
+// 医生查看预约自己的患者
+router.get('/appointments/doctor', async (req, res) => {
+  try {
+    const { doctor_id } = req.query
+    if (!doctor_id) return res.json({ code: 400, msg: '缺少医生ID' })
+    const pool = getPool()
+    const reqDb = pool.request()
+    reqDb.input('doctor_id', sql.Int, parseInt(doctor_id))
+    const rs = await reqDb.query(
+      'SELECT * FROM dbo.appointment WHERE doctor_id = @doctor_id ORDER BY appoint_date DESC, id DESC'
+    )
+    res.json({ code: 200, data: rs.recordset })
+  } catch (err) {
+    console.error('【查询医生预约异常】', err)
+    res.json({ code: 500, msg: '查询预约失败', error: err.message })
+  }
+})
+
+// 编辑预约（额度校验，排除自身记录 + 权限校验）
 router.post('/appointment/edit', async (req, res) => {
   try {
     const id = parseInt(req.body.id)
+    const login_phone = req.body.login_phone || ''
     const {
       patient_name, patient_gender, patient_age, patient_phone,
       appoint_date, time_slot, remark, doctor_id, doctor_name, hospital_name, department
     } = req.body
     if (!id) return res.json({ code: 400, msg: '缺少id参数' })
+    if (!login_phone) return res.json({ code: 403, msg: '请先登录后再操作' })
     const pool = getPool()
 
-    // 占用校验：排除当前这条记录自身
+    // 权限校验：登录手机号必须与预约手机号一致
+    const chkDb = pool.request()
+    chkDb.input('id', sql.Int, id)
+    const chkRs = await chkDb.query('SELECT patient_phone FROM dbo.appointment WHERE id = @id')
+    if (chkRs.recordset.length === 0) {
+      return res.json({ code: 404, msg: '预约记录不存在' })
+    }
+    if (chkRs.recordset[0].patient_phone !== login_phone) {
+      return res.json({ code: 403, msg: '无权操作：只能编辑本人预约' })
+    }
+
+    // 额度校验：排除当前这条记录自身
     if (appoint_date && time_slot && doctor_id) {
-      const checkDb = pool.request()
-      checkDb.input('c_doctor_id', sql.Int, doctor_id)
-      checkDb.input('c_date', sql.NVarChar(20), appoint_date)
-      checkDb.input('c_slot', sql.NVarChar(50), time_slot)
-      checkDb.input('c_id', sql.Int, id)
-      const dup = await checkDb.query(`
-        SELECT TOP 1 id FROM dbo.appointment
-        WHERE doctor_id = @c_doctor_id AND appoint_date = @c_date
-          AND time_slot = @c_slot AND status <> N'已取消' AND id <> @c_id
-      `)
-      if (dup.recordset.length > 0) {
-        return res.json({ code: 500, msg: '该医生在所选日期该时间段已被预约，请更换时间段' })
+      const quota = await getSlotQuota(doctor_id, time_slot)
+      const booked = await countBooked(doctor_id, appoint_date, time_slot, id)
+      if (booked >= quota) {
+        return res.json({ code: 500, msg: `该医生在所选日期该时间段预约已满（额度 ${quota}），请更换时间段` })
       }
     }
 
@@ -247,12 +317,26 @@ router.post('/appointment/edit', async (req, res) => {
   }
 })
 
-// 删除预约
+// 删除预约（权限校验）
 router.post('/appointment/delete', async (req, res) => {
   try {
     const id = parseInt(req.body.id)
+    const login_phone = req.body.login_phone || ''
     if (!id) return res.json({ code: 400, msg: '缺少id参数' })
+    if (!login_phone) return res.json({ code: 403, msg: '请先登录后再操作' })
     const pool = getPool()
+
+    // 权限校验：登录手机号必须与预约手机号一致
+    const chkDb = pool.request()
+    chkDb.input('id', sql.Int, id)
+    const chkRs = await chkDb.query('SELECT patient_phone FROM dbo.appointment WHERE id = @id')
+    if (chkRs.recordset.length === 0) {
+      return res.json({ code: 404, msg: '预约记录不存在' })
+    }
+    if (chkRs.recordset[0].patient_phone !== login_phone) {
+      return res.json({ code: 403, msg: '无权操作：只能删除本人预约' })
+    }
+
     const reqDb = pool.request()
     reqDb.input('id', sql.Int, id)
     await reqDb.query('DELETE FROM dbo.appointment WHERE id = @id')
@@ -260,6 +344,171 @@ router.post('/appointment/delete', async (req, res) => {
   } catch (err) {
     console.error('【删除预约异常】', err)
     res.json({ code: 500, msg: '删除预约失败', error: err.message })
+  }
+})
+
+// ============ 账号体系 ============
+
+// 注册
+router.post('/register', async (req, res) => {
+  try {
+    const { phone, password, real_name, role, doctor_id } = req.body
+    if (!phone || !password) {
+      return res.json({ code: 400, msg: '手机号与密码必填' })
+    }
+    const r = role === 'doctor' ? 'doctor' : 'patient'
+    const did = (r === 'doctor' && doctor_id) ? parseInt(doctor_id) : null
+    if (r === 'doctor' && !did) {
+      return res.json({ code: 400, msg: '医生注册需选择对应的医生信息' })
+    }
+    const pool = getPool()
+
+    // 查重
+    const dupDb = pool.request()
+    dupDb.input('phone', sql.NVarChar(20), phone)
+    const dup = await dupDb.query('SELECT TOP 1 id FROM dbo.user_account WHERE phone = @phone')
+    if (dup.recordset.length > 0) {
+      return res.json({ code: 500, msg: '该手机号已注册，请直接登录' })
+    }
+
+    const salt = randomSalt()
+    const pwdHash = hashPassword(password, salt)
+    const reqDb = pool.request()
+    reqDb.input('phone', sql.NVarChar(20), phone)
+    reqDb.input('password_hash', sql.NVarChar(128), pwdHash)
+    reqDb.input('salt', sql.NVarChar(64), salt)
+    reqDb.input('real_name', sql.NVarChar(50), real_name || '')
+    reqDb.input('role', sql.NVarChar(10), r)
+    reqDb.input('doctor_id', sql.Int, did)
+    await reqDb.query(`
+      INSERT INTO dbo.user_account (phone, password_hash, salt, real_name, role, doctor_id)
+      VALUES (@phone, @password_hash, @salt, @real_name, @role, @doctor_id)
+    `)
+    res.json({ code: 200, msg: '注册成功' })
+  } catch (err) {
+    console.error('【注册异常】', err)
+    res.json({ code: 500, msg: friendlyDbError('注册', err), error: err.message })
+  }
+})
+
+// 登录
+router.post('/login', async (req, res) => {
+  try {
+    const { phone, password } = req.body
+    if (!phone || !password) {
+      return res.json({ code: 400, msg: '请输入手机号与密码' })
+    }
+    const pool = getPool()
+    const reqDb = pool.request()
+    reqDb.input('phone', sql.NVarChar(20), phone)
+    const rs = await reqDb.query('SELECT * FROM dbo.user_account WHERE phone = @phone')
+    if (rs.recordset.length === 0) {
+      return res.json({ code: 500, msg: '该手机号尚未注册' })
+    }
+    const u = rs.recordset[0]
+    if (u.password_hash !== hashPassword(password, u.salt)) {
+      return res.json({ code: 500, msg: '密码错误' })
+    }
+    res.json({
+      code: 200,
+      msg: '登录成功',
+      data: { id: u.id, phone: u.phone, real_name: u.real_name, role: u.role, doctor_id: u.doctor_id }
+    })
+  } catch (err) {
+    console.error('【登录异常】', err)
+    res.json({ code: 500, msg: friendlyDbError('登录', err), error: err.message })
+  }
+})
+
+// ============ 医生额度配置 ============
+
+// 查询医生各时段额度
+router.get('/slot-config/:doctorId', async (req, res) => {
+  try {
+    const doctorId = parseInt(req.params.doctorId)
+    const pool = getPool()
+    const reqDb = pool.request()
+    reqDb.input('doctor_id', sql.Int, doctorId)
+    const rs = await reqDb.query('SELECT slot, quota FROM dbo.doctor_slot_config WHERE doctor_id = @doctor_id')
+    const map = {}
+    rs.recordset.forEach(row => { map[row.slot] = parseInt(row.quota) })
+    const data = TIME_SLOTS.map(s => ({ slot: s, quota: (map[s] != null ? map[s] : DEFAULT_QUOTA) }))
+    res.json({ code: 200, data })
+  } catch (err) {
+    console.error('【查询额度异常】', err)
+    res.json({ code: 500, msg: '查询额度失败', error: err.message })
+  }
+})
+
+// 保存医生各时段额度（批量 upsert）
+router.post('/slot-config', async (req, res) => {
+  try {
+    const { doctor_id, configs } = req.body
+    if (!doctor_id || !Array.isArray(configs)) {
+      return res.json({ code: 400, msg: '参数不全' })
+    }
+    const did = parseInt(doctor_id)
+    const pool = getPool()
+    for (const c of configs) {
+      const slotName = String(c.slot || '')
+      const quota = Math.max(0, parseInt(c.quota) || 0)
+      if (!slotName) continue
+      const reqDb = pool.request()
+      reqDb.input('doctor_id', sql.Int, did)
+      reqDb.input('slot', sql.NVarChar(50), slotName)
+      reqDb.input('quota', sql.Int, quota)
+      await reqDb.query(`
+        MERGE dbo.doctor_slot_config AS t
+        USING (SELECT @doctor_id AS doctor_id, @slot AS slot, @quota AS quota) AS s
+        ON (t.doctor_id = s.doctor_id AND t.slot = s.slot)
+        WHEN MATCHED THEN UPDATE SET quota = s.quota, updated_at = GETDATE()
+        WHEN NOT MATCHED THEN INSERT (doctor_id, slot, quota) VALUES (s.doctor_id, s.slot, s.quota);
+      `)
+    }
+    res.json({ code: 200, msg: '额度已更新' })
+  } catch (err) {
+    console.error('【保存额度异常】', err)
+    res.json({ code: 500, msg: '保存额度失败', error: err.message })
+  }
+})
+
+// ============ 医生留言 ============
+
+// 医生给某条预约留言
+router.post('/appointment/msg', async (req, res) => {
+  try {
+    const id = parseInt(req.body.id)
+    const doctor_msg = req.body.doctor_msg != null ? String(req.body.doctor_msg) : ''
+    if (!id) return res.json({ code: 400, msg: '缺少id参数' })
+    const pool = getPool()
+    const reqDb = pool.request()
+    reqDb.input('id', sql.Int, id)
+    reqDb.input('doctor_msg', sql.NVarChar(500), doctor_msg)
+    await reqDb.query(
+      'UPDATE dbo.appointment SET doctor_msg = @doctor_msg, msg_time = GETDATE() WHERE id = @id'
+    )
+    res.json({ code: 200, msg: '留言成功' })
+  } catch (err) {
+    console.error('【留言异常】', err)
+    res.json({ code: 500, msg: '留言失败', error: err.message })
+  }
+})
+
+// 医生删除某条预约的留言（清空后患者端不再显示）
+router.post('/appointment/msg-delete', async (req, res) => {
+  try {
+    const id = parseInt(req.body.id)
+    if (!id) return res.json({ code: 400, msg: '缺少id参数' })
+    const pool = getPool()
+    const reqDb = pool.request()
+    reqDb.input('id', sql.Int, id)
+    await reqDb.query(
+      'UPDATE dbo.appointment SET doctor_msg = NULL, msg_time = NULL WHERE id = @id'
+    )
+    res.json({ code: 200, msg: '留言已删除' })
+  } catch (err) {
+    console.error('【删除留言异常】', err)
+    res.json({ code: 500, msg: '删除留言失败', error: err.message })
   }
 })
 
