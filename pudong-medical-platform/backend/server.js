@@ -22,6 +22,7 @@ const resilienceApi = require('./routes/resilienceApi')
 const drugApi = require('./routes/drugApi')
 const medicalStaffApi = require('./routes/medicalStaffApi')
 const healthApi = require('./routes/healthApi')
+const adminRouter = require('./routes/adminApi')
 const app = express()
 const PORT = 3000
 app.use(cors())
@@ -59,6 +60,7 @@ app.use('/api/resilience', resilienceApi)
 app.use('/api/drug', drugApi)
 app.use('/api/staff', medicalStaffApi)
 app.use('/api/health', healthApi)
+app.use('/api/admin', adminRouter)
 //全局错误捕获
 app.use((err, req, res, next) => {
     console.error(err)

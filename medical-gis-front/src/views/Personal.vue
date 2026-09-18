@@ -13,6 +13,7 @@
         </div>
         <div class="pc-hero-btns">
           <button class="pc-btn ghost" @click="$router.push('/home')">← 返回首页</button>
+          <button v-if="user.role === 'admin'" class="pc-btn admin" @click="$router.push('/admin-manage')">🛡️ 权限管理</button>
           <button class="pc-btn danger" @click="handleLogout">退出登录</button>
         </div>
       </div>
@@ -486,17 +487,33 @@ function summarizeSite(json) {
 <style scoped>
 .pc-page {
   min-height: 100vh;
-  background: #f0f4f8;
+  background:
+    radial-gradient(1100px 420px at 0% 0%, rgba(33, 150, 243, 0.09), transparent 55%),
+    linear-gradient(180deg, #e9f1fb 0%, #f4f8fd 36%, #edf2f7 100%);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   color: #1f2937;
 }
 
 /* ===== Hero ===== */
 .pc-hero {
-  background: linear-gradient(135deg, #2196f3 0%, #1565c0 100%);
-  box-shadow: 0 2px 12px rgba(21, 101, 192, 0.18);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(1000px 380px at 85% -30%, rgba(120, 190, 255, 0.5), transparent 60%),
+    radial-gradient(700px 300px at 5% 150%, rgba(21, 101, 192, 0.5), transparent 65%),
+    linear-gradient(135deg, #1565c0 0%, #1e88e5 45%, #42a5f5 100%);
+  box-shadow: 0 6px 24px rgba(21, 101, 192, 0.28);
+}
+.pc-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 28px);
+  pointer-events: none;
 }
 .pc-hero-inner {
+  position: relative;
+  z-index: 1;
   max-width: 1080px;
   margin: 0 auto;
   padding: 24px 28px;
@@ -544,6 +561,8 @@ function summarizeSite(json) {
 .pc-btn.ghost:hover { background: rgba(255, 255, 255, 0.28); }
 .pc-btn.danger { background: #fff; color: #e53935; }
 .pc-btn.danger:hover { background: #ffebee; }
+.pc-btn.admin { background: #ff9800; color: #fff; }
+.pc-btn.admin:hover { background: #f57c00; }
 .pc-btn.primary { background: #2196f3; color: #fff; }
 .pc-btn.primary:hover { background: #1976d2; }
 .pc-btn.sm { padding: 6px 14px; font-size: 13px; }
@@ -665,7 +684,7 @@ function summarizeSite(json) {
   border-radius: 8px;
   transition: all .2s;
 }
-.pc-tabs button.active { background: #2196f3; color: #fff; font-weight: 600; }
+.pc-tabs button.active { background: linear-gradient(135deg, #2196f3, #1565c0); color: #fff; font-weight: 600; box-shadow: 0 3px 8px rgba(33, 150, 243, 0.32); }
 
 /* ===== 预约卡片 ===== */
 .appoint-card {

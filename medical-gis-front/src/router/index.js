@@ -9,6 +9,7 @@ import Personal from '../views/Personal.vue'
 import DrugDatabase from '../views/DrugDatabase.vue'
 import MedicalStaffQuery from '../views/MedicalStaffQuery.vue'
 import HealthManagement from '../views/HealthManagement.vue'
+import AdminManage from '../views/AdminManage.vue'
 
 const routes = [
   { path: '/', redirect: '/home' },
@@ -65,6 +66,12 @@ const routes = [
     name: 'HealthManagement',
     component: HealthManagement,
     meta: { title: '健康管理', requireAuth: true }
+  },
+  {
+    path: '/admin-manage',
+    name: 'AdminManage',
+    component: AdminManage,
+    meta: { title: '管理员管理', requireAuth: true, requireAdmin: true }
   }
 ]
 
