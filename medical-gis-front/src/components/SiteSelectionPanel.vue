@@ -60,7 +60,7 @@ import request from '../api/request'
 const props = defineProps({
   triggerRefresh:{ type:Boolean, default:false }
 })
-defineEmits(['locate-map'])
+const emit = defineEmits(['locate-map','delete-map'])
 const list = ref([])
 const deleteVisible = ref(false)
 const deleteTarget = ref(null)
@@ -104,6 +104,7 @@ async function confirmDelete(){
   try{
     await request.delete(`/site/del?id=${deleteTarget.value.id}`)
     await fetchSiteList()
+    emit('delete-map')
     deleteVisible.value = false
     deleteTarget.value = null
   }catch(e){

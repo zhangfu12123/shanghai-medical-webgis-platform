@@ -101,6 +101,7 @@
             v-if="sitePanelVisible"
             :trigger-refresh="siteNeedRefresh"
             @locate-map="handleSiteLocate"
+            @delete-map="handleSiteDelete"
           />
         </div>
         <div class="hud-left-rail">
@@ -809,10 +810,12 @@ function toggleSitePanel(){
   resiliencePanelVisible.value = false
   heatStatShow.value = false
   if(sitePanelVisible.value){
-    siteNeedRefresh.value = true
     isSiteSelectMode.value = true
     siteTip.value = "🟢请在地图上点击，选取候选选址点"
+    siteNeedRefresh.value = true
+    setTimeout(() => { siteNeedRefresh.value = false }, 100)
   }else{
+    siteNeedRefresh.value = false
     isSiteSelectMode.value = false
     clearSiteBufferDraw()
   }
@@ -843,6 +846,10 @@ function handleSiteLocate({lng,lat,analyzeResult}){
   }
 }
 
+function handleSiteDelete(){
+  clearSiteBufferDraw()
+}
+
 async function confirmSiteEval(){
   if(!tempSiteLng.value || !tempSiteLat.value){
     showToast("请先在地图点击选点","warning")
@@ -871,12 +878,15 @@ async function confirmSiteEval(){
       resultJson: JSON.stringify(analyzeResult)
     })
     showToast("选址评估保存成功！","success")
-    siteNeedRefresh.value = true
     evalNameInput.value = ''
     analyzeRadiusM.value = ' '
     tempSiteLng.value = null
     tempSiteLat.value = null
     showSiteModal.value = false
+    // 先复位再置真，确保触发右侧候选记录面板的刷新监听
+    siteNeedRefresh.value = false
+    await nextTick()
+    siteNeedRefresh.value = true
     setTimeout(()=>{
       siteNeedRefresh.value = false
     },100)
