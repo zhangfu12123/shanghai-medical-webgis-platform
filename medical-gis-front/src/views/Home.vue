@@ -241,11 +241,19 @@
 
       <div class="bottom-tool-bar">
         <div class="tool-group">
-          <select v-model="loadPointType" class="tool-select">
-            <option value="">--资源类型--</option>
-            <option v-for="t in medicalTypeList" :key="t.type" :value="t.type">{{ t.type }}</option>
-            <option value="community">居民区</option>
-          </select>
+          <div class="resource-type-menu-wrap" @click.stop>
+            <button class="tool-btn" @click="toggleResourceTypeMenu">资源类型{{ loadPointType.length ? `(${loadPointType.length})` : '' }}</button>
+            <div v-if="resourceTypeMenuShow" class="resource-type-menu">
+              <label v-for="t in medicalTypeList" :key="t.type" class="resource-type-menu-item">
+                <input v-model="loadPointType" type="checkbox" :value="t.type" />
+                <span>{{ t.type }}</span>
+              </label>
+              <label class="resource-type-menu-item">
+                <input v-model="loadPointType" type="checkbox" value="community" />
+                <span>居民区</span>
+              </label>
+            </div>
+          </div>
           <button class="tool-btn" @click="handleLoadPoint">加载点位</button>
           <button class="tool-btn" @click="clearAllMarker">清空图层</button>
         </div>
@@ -313,7 +321,7 @@
 </template>
 
 <script setup>
-import {ref,onUnmounted,nextTick,onMounted} from 'vue'
+import {ref,watch,onUnmounted,nextTick,onMounted} from 'vue'
 import {useRouter} from 'vue-router'
 import MapContainer from '../components/MapContainer.vue'
 import AiChatDialog from '../components/AiChatDialog.vue'
@@ -330,6 +338,7 @@ const router = useRouter()
 const aiDialogVisible = ref(false)
 const aiChatRef = ref(null)
 let map = null
+let resourceMarkers = []
 let driving = null
 let autoStart = null
 let autoEnd = null
@@ -337,7 +346,14 @@ let geocoder = null
 let placeSearch = null
 let routePluginsReady = false
 const userInfo = ref(getUserInfo())
-const loadPointType = ref('')
+const savedLoadPointTypes = localStorage.getItem('medical_load_point_types')
+let initialLoadPointTypes = []
+try{
+  initialLoadPointTypes = savedLoadPointTypes ? JSON.parse(savedLoadPointTypes) : []
+}catch(e){
+  localStorage.removeItem('medical_load_point_types')
+}
+const loadPointType = ref(Array.isArray(initialLoadPointTypes) ? initialLoadPointTypes : [])
 const showSiteModal = ref(false)
 const siteTip = ref('')
 const evalNameInput = ref('')
@@ -361,6 +377,9 @@ const route = ref({
 const mapClickStatus = ref(0)
 const medicalTypeList = ref([])
 let currentInfoWin = null
+watch(loadPointType,(types)=>{
+  localStorage.setItem('medical_load_point_types',JSON.stringify(types))
+})
 const toast = ref({
   show:false,
   msg:'',
@@ -633,10 +652,17 @@ function onHeatStatUpdate(res){
   heatStatShow.value = true
 }
 const resourceMenuShow = ref(false)
+const resourceTypeMenuShow = ref(false)
 function toggleResourceMenu(){
   resourceMenuShow.value = !resourceMenuShow.value
 }
-function closeResourceMenu(){ resourceMenuShow.value = false }
+function toggleResourceTypeMenu(){
+  resourceTypeMenuShow.value = !resourceTypeMenuShow.value
+}
+function closeResourceMenu(){
+  resourceMenuShow.value = false
+  resourceTypeMenuShow.value = false
+}
 function openMedicalStaff(){
   resourceMenuShow.value = false
   router.push('/medical-staff-query')
@@ -715,6 +741,7 @@ const onMapReady = (m)=>{
   map.on('zoomend', refreshMapLiveState)
   refreshMapLiveState()
   initRealtimeTraffic()
+  if(loadPointType.value.length > 0) handleLoadPoint()
 }
 
 function globalMapClickHandler(e){
@@ -782,6 +809,7 @@ function toggleSitePanel(){
   resiliencePanelVisible.value = false
   heatStatShow.value = false
   if(sitePanelVisible.value){
+    siteNeedRefresh.value = true
     isSiteSelectMode.value = true
     siteTip.value = "🟢请在地图上点击，选取候选选址点"
   }else{
@@ -1055,19 +1083,24 @@ function getMedicalMarkerStyle(type){
 }
 
 async function handleLoadPoint(){
-  if(!loadPointType.value) return showToast("请选择点位类型","warning")
-  if(loadPointType.value === 'community'){
-    await loadCommunityPoint()
-  }else{
-    const url = '/medical/point?type='+encodeURIComponent(loadPointType.value)
-    const res = await request.get(url)
-    if(allRawMedical.value.length === 0){
-      const resAll = await request.get('/medical/point')
-      allRawMedical.value = [...resAll.data]
-    }
-    rawMedicalData.value = [...res.data]
-    allMedicalPoints.value = res.data.map(p=>turf.point([p.lng,p.lat],{name:p.name,type:p.type}))
-    res.data.forEach(item=>{
+  const selectedTypes = Array.isArray(loadPointType.value) ? loadPointType.value : [loadPointType.value]
+  if(selectedTypes.length === 0) return showToast("请选择点位类型","warning")
+  clearResourceMarkers()
+  allMedicalPoints.value = []
+  rawMedicalData.value = []
+  if(selectedTypes.includes('community')) await loadCommunityPoint()
+  const medicalTypes = selectedTypes.filter(type => type !== 'community')
+  if(medicalTypes.length === 0) return
+
+  const responses = await Promise.all(medicalTypes.map(type => request.get('/medical/point?type='+encodeURIComponent(type))))
+  const medicalData = responses.flatMap(response => response.data || [])
+  if(allRawMedical.value.length === 0){
+    const resAll = await request.get('/medical/point')
+    allRawMedical.value = [...resAll.data]
+  }
+  rawMedicalData.value = medicalData
+  allMedicalPoints.value = medicalData.map(p=>turf.point([p.lng,p.lat],{name:p.name,type:p.type}))
+  medicalData.forEach(item=>{
       const markerStyle = getMedicalMarkerStyle(item.type)
       const marker = new window.AMap.Marker({
         position:[item.lng,item.lat],
@@ -1126,6 +1159,7 @@ async function handleLoadPoint(){
 offset: new window.AMap.Pixel(-7, -18),
         map:map
       })
+      resourceMarkers.push(marker)
       marker.on('click',()=>{
         if(routePanelShow.value){
           fillRouteByPoint(item.name, item.lng, item.lat)
@@ -1143,13 +1177,18 @@ offset: new window.AMap.Pixel(-7, -18),
         infoWin.open(map,marker.getPosition())
         bindPopupDomEvent(infoWin, item, showToast)
       })
-    })
-  }
+  })
+}
+
+function clearResourceMarkers(){
+  resourceMarkers.forEach(marker=>marker.setMap(null))
+  resourceMarkers = []
 }
 
 function clearAllMarker(){
   if(!map) return
   map.clearMap()
+  resourceMarkers = []
   if(driving) driving.clear()
   driving = null
   clearSiteBufferDraw()
@@ -1221,6 +1260,7 @@ async function loadCommunityPoint(){
 offset: new window.AMap.Pixel(-7, -18),
       map:map
     })
+    resourceMarkers.push(marker)
     marker.on('click',()=>{
       if(routePanelShow.value){
         fillRouteByPoint(item.name, item.lng, item.lat)
@@ -1274,6 +1314,45 @@ onUnmounted(()=>{
 })
 </script>
 <style scoped>
+.bottom-tool-bar {
+  z-index: 3000;
+}
+.resource-type-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  z-index: 3001;
+}
+.resource-type-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  min-width: 150px;
+  margin-bottom: 8px;
+  padding: 5px;
+  background: rgba(14, 28, 52, 0.98);
+  border: 1px solid rgba(79, 195, 247, 0.35);
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  z-index: 3002;
+}
+.resource-type-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border-radius: 4px;
+  color: #e6f7ff;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.resource-type-menu-item:hover {
+  background: rgba(79, 195, 247, 0.16);
+}
+.resource-type-menu-item input {
+  accent-color: #4fc3f7;
+  cursor: pointer;
+}
 .res-query-wrap {
   position: relative;
   display: inline-flex;

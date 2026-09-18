@@ -15,7 +15,7 @@ function getUid(){
  */
 export function buildPointPopupHtml(item){
   return `
-    <div class="info-win-root">
+    <div class="info-win-root" data-popup-point-id="${item.id}">
       <span class="win-close">×</span>
       <h4 class="win-title">${item.name}</h4>
       <p class="win-row">类型：${item.type}</p>
@@ -50,7 +50,7 @@ export function buildPointPopupHtml(item){
  */
 export function bindPopupDomEvent(infoWin, item, showToast){
   setTimeout(async ()=>{
-    const rootDom = document.querySelector('.info-win-root')
+    const rootDom = document.querySelector(`[data-popup-point-id="${item.id}"]`)
     if(!rootDom) return
     const domClose = rootDom.querySelector('.win-close')
     const domCollect = rootDom.querySelector('.btn-collect')
@@ -68,11 +68,30 @@ export function bindPopupDomEvent(infoWin, item, showToast){
       infoWin.close()
     }
     let isCollected = false
+    let collectBusy = false
+    let commentBusy = false
+    let refreshBusy = false
+
+    async function loadCollectStatus(){
+      if(!currUserId) return
+      try{
+        const resCollect = await request.get(`/collect/myCollect/${currUserId}`)
+        const collectList = Array.isArray(resCollect.data) ? resCollect.data : []
+        isCollected = collectList.some(record => Number(record.point_id) === Number(item.id))
+        domCollect.innerText = isCollected ? "取消收藏" : "收藏医疗点"
+      }catch(e){
+        console.error('获取收藏状态失败',e)
+      }
+    }
+
     domCollect.onclick = async ()=>{
       if(!currUserId){
         showToast("请先登录账号","warning")
         return
       }
+      if(collectBusy) return
+      collectBusy = true
+      domCollect.disabled = true
       try{
         if(isCollected){
           await request.delete('/collect/cancelCollect',{
@@ -89,11 +108,16 @@ export function bindPopupDomEvent(infoWin, item, showToast){
         }
       }catch(e){
         showToast(e?.msg||"操作失败","error")
+      }finally{
+        collectBusy = false
+        domCollect.disabled = false
       }
     }
 
     //刷新留言
     async function refreshComment(){
+      if(refreshBusy) return
+      refreshBusy = true
       try{
         const resCom = await request.get(`/comment/list/${item.id}`)
         const list = resCom.data||[]
@@ -173,6 +197,8 @@ export function bindPopupDomEvent(infoWin, item, showToast){
         })
       }catch(err){
         domCommentWrap.innerHTML = `<div style="color:#ff7878;font-size:13px;">获取留言失败</div>`
+      }finally{
+        refreshBusy = false
       }
     }
 
@@ -190,6 +216,9 @@ export function bindPopupDomEvent(infoWin, item, showToast){
         showToast("留言不能为空","warning")
         return
       }
+      if(commentBusy) return
+      commentBusy = true
+      domSubmit.disabled = true
       try{
         await request.post('/comment/add',{
           point_id:item.id,
@@ -203,9 +232,12 @@ export function bindPopupDomEvent(infoWin, item, showToast){
         await refreshComment()
       }catch(e){
         showToast(e?.msg||"提交留言失败","error")
+      }finally{
+        commentBusy = false
+        domSubmit.disabled = false
       }
     }
 
-    await refreshComment()
+    await Promise.all([loadCollectStatus(),refreshComment()])
   },120)
 }

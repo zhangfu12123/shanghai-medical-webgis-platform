@@ -264,13 +264,42 @@
   background:#27416b;
 }
 .tool-select{
-  height:32px;
+  min-height:32px;
+  height:auto;
   background:#0a1728;
   border:1px solid rgba(79,195,247,0.25);
   color:#d0e4ff;
   border-radius:4px;
   padding:0 8px;
   font-size:13px;
+}
+.resource-type-options{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px 9px;
+  max-width:420px;
+  padding:4px 8px;
+  background:#0a1728;
+  border:1px solid rgba(79,195,247,0.25);
+  border-radius:4px;
+  color:#d0e4ff;
+  font-size:13px;
+}
+.resource-type-label{
+  color:#86b7d8;
+  white-space:nowrap;
+}
+.resource-type-option{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.resource-type-option input{
+  accent-color:#4fc3f7;
+  cursor:pointer;
 }
 .tool-btn{
   height:32px;
@@ -958,7 +987,8 @@
 }
 
 .tool-select{
-  height:34px;
+  min-height:34px;
+  height:auto;
   border-radius:6px;
 }
 
