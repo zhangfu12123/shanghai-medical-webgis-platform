@@ -23,6 +23,7 @@ const drugApi = require('./routes/drugApi')
 const medicalStaffApi = require('./routes/medicalStaffApi')
 const healthApi = require('./routes/healthApi')
 const adminRouter = require('./routes/adminApi')
+const triageApi = require('./routes/triageApi')
 const app = express()
 const PORT = 3000
 app.use(cors())
@@ -61,6 +62,7 @@ app.use('/api/drug', drugApi)
 app.use('/api/staff', medicalStaffApi)
 app.use('/api/health', healthApi)
 app.use('/api/admin', adminRouter)
+app.use('/api/triage', triageApi)
 //全局错误捕获
 app.use((err, req, res, next) => {
     console.error(err)

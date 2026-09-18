@@ -27,6 +27,7 @@
       <button :class="{ active: view === 'query' }" @click="switchView('query')">🔍 医生查询</button>
       <button :class="{ active: view === 'schedule' }" @click="switchView('schedule')">🗓 医院排班</button>
       <button :class="{ active: view === 'mine' }" @click="switchView('mine')">📋 我的预约</button>
+      <button class="tri-entry" @click="$router.push('/smart-triage')">🧭 智慧导诊</button>
       <button v-if="isDoctor" :class="{ active: view === 'doctor' }" @click="switchView('doctor')">👨‍⚕️ 医生工作台</button>
     </nav>
 
@@ -122,7 +123,7 @@
               <li>"上午"指 08:30-11:30</li>
               <li>"下午"指 13:30-16:30</li>
               <li>"全天"指 08:00-16:30</li>
-              <li>如遇医生不能正常出诊，医生将给您留言</li>
+              <li>如遇医生临时停诊，系统将自动通知</li>
             </ul>
           </div>
           <div class="sa-card sa-stats">
@@ -330,9 +331,9 @@
             <ul class="aa-tip-list">
               <li>请如实填写患者信息，手机号将用于接收预约通知</li>
               <li>每个时段名额有限，约满后需更换时间段</li>
-              <li>请按预约时间段提前15分钟到院取号</li>
+              <li>请按预约时间段提前 15 分钟到院取号</li>
               <li>如需取消预约，请在「我的预约」中操作</li>
-              <li>就诊当天请携带本人身份证/医保卡</li>
+              <li>就诊当天请携带本人身份证 / 医保卡</li>
             </ul>
           </div>
         </aside>
@@ -350,7 +351,7 @@
         <!-- 额度设置 -->
         <div class="quota-card">
           <h3 class="sc-title">每日每时段预约额度设置</h3>
-          <p class="quota-tip">以下额度为每个时段每天最多可接受的预约人数</p>
+          <p class="quota-tip">以下额度为每个时段每天最多可接受的预约人数，修改后点击「保存额度设置」即时生效。</p>
           <div class="quota-grid">
             <div class="quota-item" v-for="c in slotConfigs" :key="c.slot">
               <span class="quota-slot">{{ c.slot }}</span>
@@ -1276,6 +1277,13 @@ onMounted(() => {
 }
 .tab-bar button:not(.active):hover { color: #0d9488; background: #f0fdfa; }
 .tab-bar button.active { color: #fff; background: linear-gradient(135deg, #0d9488, #0f766e); font-weight: 600; box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3); }
+.tab-bar button.tri-entry {
+  color: #b45309;
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  border: 1px solid #fcd34d;
+  font-weight: 600;
+}
+.tab-bar button.tri-entry:hover { color: #92400e; background: linear-gradient(135deg, #fef3c7, #fde68a); }
 
 .view-body { padding: 24px 28px; max-width: 1200px; margin: 0 auto; }
 
