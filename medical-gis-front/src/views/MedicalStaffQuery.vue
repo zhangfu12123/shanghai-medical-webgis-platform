@@ -1,6 +1,5 @@
 <template>
   <div class="staff-page">
-    <!-- 顶部：蓝色渐变 -->
     <header class="staff-header">
       <div class="hd-left">
         <button class="back-btn" @click="goBack">← 返回</button>
