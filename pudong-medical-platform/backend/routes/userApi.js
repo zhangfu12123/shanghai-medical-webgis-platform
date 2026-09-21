@@ -76,6 +76,7 @@ router.post('/login', async (req, res) => {
             .query(`select * from sys_user where username=@un and password=@pw`)
         if (rs.recordset.length === 0) return res.fail("账号密码错误", 401)
         const user = rs.recordset[0]
+        if (user.status === 'banned') return res.fail("该账号已被封禁，请联系管理员", 403)
         let expiresTime = remember ? "7d" : "24h"
         const token = jwt.sign(
             { userId: user.id, username: user.username, role: user.role },
@@ -85,7 +86,7 @@ router.post('/login', async (req, res) => {
         return res.success({
             token,
             remember,
-            userInfo: { id: user.id, username: user.username, real_name: user.real_name, role: user.role }
+            userInfo: { id: user.id, username: user.username, real_name: user.real_name, role: user.role, status: user.status }
         }, "登录成功")
     } catch (e) {
         return res.fail(e.message)
