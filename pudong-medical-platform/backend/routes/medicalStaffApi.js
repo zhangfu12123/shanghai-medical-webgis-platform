@@ -3,10 +3,6 @@ const router = express.Router()
 const crypto = require('crypto')
 const { getPool, sql } = require('../db/db')
 
-/**
- * 医疗人员查询 / 排班 / 预约 / 账号 / 额度 / 留言 后端接口
- * 挂载前缀建议：app.use('/api/staff', require('./routes/medicalStaffApi'))
- */
 
 // ============ 工具函数 ============
 const DEFAULT_QUOTA = 5
