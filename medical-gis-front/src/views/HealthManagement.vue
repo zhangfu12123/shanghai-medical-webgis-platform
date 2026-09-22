@@ -53,11 +53,11 @@
           <div class="form-grid">
             <div class="form-item">
               <label>测量日期 <i>*</i></label>
-              <input v-model="recordForm.measure_date" type="date" />
+              <input v-model="recordForm.measure_date" type="date" :min="minMeasureDate" :max="today()" />
             </div>
             <div class="form-item">
               <label>测量时间</label>
-              <input v-model="recordForm.measure_time" type="time" />
+              <input v-model="recordForm.measure_time" type="time" :min="minMeasureTime" :max="maxMeasureTime" />
             </div>
             <div class="form-item">
               <label>收缩压 (mmHg)</label>
@@ -184,7 +184,17 @@
       <div class="panel">
         <h3 class="panel-title">🎯 个性化健康管理方案</h3>
         <div class="goal-row">
-          <input v-model="planForm.goal" class="search-input" placeholder="请输入健康目标" />
+          <select v-model="planForm.goal" class="search-input">
+            <option value="">请选择健康目标</option>
+            <option v-for="goal in planGoalOptions" :key="goal" :value="goal">{{ goal }}</option>
+            <option value="custom">自定义目标</option>
+          </select>
+          <input
+            v-if="planForm.goal === 'custom'"
+            v-model="customPlanGoal"
+            class="search-input"
+            placeholder="请输入您的健康目标"
+          />
           <button class="btn-primary" @click="genPlan">生成方案</button>
         </div>
 
@@ -308,7 +318,7 @@
           </div>
           <div class="form-item full">
             <label>既往病史</label>
-            <input v-model="userForm.history" placeholder="如 高血压、糖尿病等" />
+            <input v-model="userForm.history" placeholder="" />
           </div>
         </div>
         <div class="em-actions">
@@ -325,7 +335,7 @@
         <div class="form-grid">
           <div class="form-item">
             <label>病名 <i>*</i></label>
-            <input v-model="chronicForm.disease_name" placeholder="如 高血压" />
+            <input v-model="chronicForm.disease_name" placeholder="" />
           </div>
           <div class="form-item">
             <label>确诊日期</label>
@@ -333,7 +343,7 @@
           </div>
           <div class="form-item full">
             <label>分期/分级</label>
-            <input v-model="chronicForm.stage" placeholder="如 1级高血压" />
+            <input v-model="chronicForm.stage" placeholder="" />
           </div>
           <div class="form-item full">
             <label>病情跟踪</label>
@@ -358,19 +368,19 @@
         <div class="form-grid">
           <div class="form-item">
             <label>药名 <i>*</i></label>
-            <input v-model="reminderForm.medicine_name" placeholder="如 硝苯地平" />
+            <input v-model="reminderForm.medicine_name" placeholder="" />
           </div>
           <div class="form-item">
             <label>关联疾病</label>
-            <input v-model="reminderForm.disease_name" placeholder="如 高血压" />
+            <input v-model="reminderForm.disease_name" placeholder="" />
           </div>
           <div class="form-item">
             <label>剂量</label>
-            <input v-model="reminderForm.dosage" placeholder="如 30mg/次" />
+            <input v-model="reminderForm.dosage" placeholder="" />
           </div>
           <div class="form-item">
             <label>频次</label>
-            <input v-model="reminderForm.frequency" placeholder="如 每日1次" />
+            <input v-model="reminderForm.frequency" placeholder="" />
           </div>
           <div class="form-item">
             <label>提醒时间</label>
@@ -435,6 +445,8 @@ const riskResult = ref(null)
 // 方案
 const planHistory = ref([])
 const planForm = reactive({ goal: '', diet: '', exercise: '', lifestyle: '' })
+const customPlanGoal = ref('')
+const planGoalOptions = ['控制血压', '控制血糖', '科学减重', '改善睡眠', '增强体质', '综合改善健康']
 
 // 慢病 + 用药
 const chronicList = ref([])
@@ -491,6 +503,16 @@ const bmi = computed(() => {
 
 // 最新一条记录
 const latest = computed(() => recordList.value[0] || null)
+const latestMeasurement = computed(() => {
+  return recordList.value.slice().sort((a, b) => measurementValue(b).localeCompare(measurementValue(a)))[0] || null
+})
+const minMeasureDate = computed(() => latestMeasurement.value ? latestMeasurement.value.measure_date : '')
+const minMeasureTime = computed(() => {
+  const latestRecord = latestMeasurement.value
+  if (!latestRecord || recordForm.measure_date !== latestRecord.measure_date) return ''
+  return nextMinute(latestRecord.measure_time || '00:00')
+})
+const maxMeasureTime = computed(() => recordForm.measure_date === today() ? currentTime() : '')
 
 // 指标卡片
 const metricCards = computed(() => {
@@ -514,6 +536,28 @@ function judgeMetric(label, val, unit, fn) {
     level = l
   }
   return { label, value: val, unit, status, level }
+}
+
+function measurementValue(record) {
+  return `${record.measure_date || ''}T${record.measure_time || '00:00'}`
+}
+
+function currentTime() {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function nextMinute(time) {
+  const [hour, minute] = String(time || '00:00').split(':').map(Number)
+  const total = Math.min(hour * 60 + minute + 1, 23 * 60 + 59)
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+function isValidMeasurementTime() {
+  const selected = measurementValue(recordForm)
+  const previous = latestMeasurement.value ? measurementValue(latestMeasurement.value) : ''
+  const now = `${today()}T${currentTime()}`
+  return Boolean(recordForm.measure_date && recordForm.measure_time) && selected > previous && selected <= now
 }
 
 // 趋势
@@ -609,20 +653,30 @@ async function saveRisk() {
 function genPlan() {
   if (!currentUser.value) { showToast('请先选择健康档案', 'error'); return }
   const r = calcRisk()
-  const goal = planForm.goal || '综合改善健康'
-  const bp = (r && r.items.join('').indexOf('血压偏高') > -1)
-  const glu = (r && r.items.join('').indexOf('血糖') > -1 && r.items.join('').indexOf('正常') < 0)
-  planForm.diet = bp
-    ? `围绕「${goal}」：低盐低脂饮食，每日食盐控制在5g以内，少食腌制、油炸及高胆固醇食物；` +
-      '多吃新鲜蔬果、全谷物和优质蛋白（鱼、豆制品），控制总热量。'
-    : (glu
-      ? `围绕「${goal}」：控制主食总量，优选低GI食物（燕麦、糙米），定时定量进餐，` +
-        '少食高糖高脂零食，多吃蔬菜与适量优质蛋白。'
-      : `围绕「${goal}」：均衡膳食，荤素搭配，保证蔬菜、水果、全谷物、优质蛋白摄入，` +
-        '减少高盐高糖高油食物，足量饮水。')
-  planForm.exercise = '建议每周3-5次、每次30分钟左右中等强度有氧运动（快走、慢跑、游泳、骑车），' +
-    '配合每周2次力量训练，运动前后注意热身与拉伸，量力而行。'
-  planForm.lifestyle = '规律作息、保证7-8小时睡眠，戒烟限酒，保持心情舒畅；每日自测并记录体重、血压等指标，定期体检。'
+  const goal = planForm.goal === 'custom' ? customPlanGoal.value.trim() : planForm.goal
+  if (!goal) { showToast('请选择或填写健康目标', 'error'); return }
+  const latestRecord = latest.value
+  const hasHighBloodPressure = latestRecord && (latestRecord.systolic >= 140 || latestRecord.diastolic >= 90)
+  const hasHighBloodSugar = latestRecord && latestRecord.blood_sugar >= 6.1
+  const currentBmi = bmi.value ? Number(bmi.value) : null
+  const focus = goal === '控制血压' || hasHighBloodPressure
+    ? '低盐低脂饮食，每日食盐尽量控制在5g以内，少食腌制、油炸及高胆固醇食物；'
+    : goal === '控制血糖' || hasHighBloodSugar
+      ? '控制主食总量，优先选择燕麦、糙米等低GI食物，定时定量进餐，减少含糖饮料和甜食；'
+      : goal === '科学减重' || (currentBmi != null && currentBmi >= 24)
+        ? '控制每日总热量，增加蔬菜、全谷物和优质蛋白，减少高油高糖零食，避免快速节食；'
+        : '均衡摄入蔬菜、水果、全谷物和优质蛋白，减少高盐、高糖、高油食物，保持足量饮水。'
+  planForm.diet = `围绕「${goal}」：${focus}结合当前档案和检测数据，建议记录每日饮食，观察体重及相关指标变化。`
+  const exercise = goal === '改善睡眠'
+    ? '建议白天进行每周3-5次、每次30分钟左右的中等强度运动，睡前避免剧烈运动，建立固定作息。'
+    : '建议每周3-5次、每次30分钟左右中等强度有氧运动（快走、慢跑、游泳、骑车），配合每周2次力量训练，量力而行。'
+  planForm.exercise = currentBmi != null && currentBmi < 18.5
+    ? `${exercise}当前体重偏低，运动以增强体能为主，并注意补充营养。`
+    : exercise
+  planForm.lifestyle = goal === '改善睡眠'
+    ? '固定上床和起床时间，保证7-8小时睡眠，睡前减少咖啡因和屏幕使用；持续记录睡眠情况，必要时咨询专业医生。'
+    : '规律作息、保证7-8小时睡眠，戒烟限酒，保持心情舒畅；持续记录体重、血压和血糖等指标，定期复查。'
+  planForm.goal = goal
 }
 async function savePlan() {
   if (!currentUser.value || !planForm.diet) return
@@ -692,7 +746,11 @@ async function saveUser() {
 // 监测记录操作
 async function addRecord() {
   if (!currentUser.value) { showToast('请先选择健康档案', 'error'); return }
-  if (!recordForm.measure_date) { showToast('请选择测量日期', 'error'); return }
+  if (!recordForm.measure_date || !recordForm.measure_time) { showToast('请选择测量日期和时间', 'error'); return }
+  if (!isValidMeasurementTime()) {
+    showToast('测量时间必须晚于上次测量时间且不能超过当前时间', 'error')
+    return
+  }
   try {
     const res = await request.post('/health/record', { user_id: currentUser.value.id, ...recordForm })
     if (res.code === 200) {
@@ -806,7 +864,7 @@ async function loadReminders() {
 }
 function loadAll() {
   riskResult.value = null
-  Object.assign(recordForm, { measure_date: today() })
+  Object.assign(recordForm, { measure_date: today(), measure_time: currentTime() })
   loadRecords()
   loadRisks()
   loadPlans()
@@ -816,6 +874,7 @@ function loadAll() {
 
 onMounted(async () => {
   recordForm.measure_date = today()
+  recordForm.measure_time = currentTime()
   await loadUsers()
   loadAll()
 })
@@ -1087,6 +1146,7 @@ onMounted(async () => {
 /* 方案 */
 .goal-row { display: flex; gap: 12px; margin-bottom: 16px; align-items: stretch; }
 .goal-row .btn-primary { min-width: 110px; flex-shrink: 0; }
+.plan-context { margin: -6px 0 16px; font-size: 12px; color: #8696a8; }
 .search-input {
   flex: 1;
   padding: 10px 16px;
@@ -1106,6 +1166,11 @@ onMounted(async () => {
 .ph-head .link-del { margin-left: auto; flex-shrink: 0; }
 .ph-date { font-size: 12px; color: #fff; background: #2196f3; padding: 3px 10px; border-radius: 4px; }
 .ph-head b { font-size: 15px; color: #1a2740; }
+@media (max-width: 640px) {
+  .goal-row { flex-wrap: wrap; }
+  .goal-row .search-input { min-width: 0; flex: 1 1 100%; }
+  .goal-row .btn-primary { width: 100%; }
+}
 .ph-line { font-size: 13px; color: #55606e; margin-bottom: 5px; }
 
 /* 慢病 */

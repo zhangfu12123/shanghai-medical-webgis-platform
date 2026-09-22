@@ -96,10 +96,30 @@ router.get('/records', async (req, res) => {
 router.post('/record', async (req, res) => {
   try {
     const { user_id, measure_date, measure_time, systolic, diastolic, blood_sugar, heart_rate, weight, remark } = req.body
-    if (!user_id || !measure_date) {
-      return res.json({ code: 500, msg: '参数不全：用户与测量日期必填' })
+    if (!user_id || !measure_date || !measure_time) {
+      return res.json({ code: 500, msg: '参数不全：用户、测量日期和时间必填' })
     }
     const pool = getPool()
+    const latestDb = pool.request()
+    latestDb.input('user_id', sql.Int, parseInt(user_id))
+    const latestRs = await latestDb.query(`
+      SELECT TOP 1 measure_date, measure_time
+      FROM dbo.health_record
+      WHERE user_id = @user_id
+      ORDER BY measure_date DESC, measure_time DESC, id DESC
+    `)
+    const latest = latestRs.recordset[0] || null
+    const selectedValue = `${measure_date}T${measure_time}`
+    const previousValue = latest ? `${latest.measure_date}T${latest.measure_time || '00:00'}` : ''
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    if (selectedValue > `${today}T${currentTime}`) {
+      return res.json({ code: 400, msg: '测量时间不能超过当前时间' })
+    }
+    if (previousValue && selectedValue <= previousValue) {
+      return res.json({ code: 400, msg: '测量时间必须晚于上次测量时间' })
+    }
     const reqDb = pool.request()
     reqDb.input('user_id', sql.Int, parseInt(user_id))
     reqDb.input('measure_date', sql.NVarChar(20), measure_date)

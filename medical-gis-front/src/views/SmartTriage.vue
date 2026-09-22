@@ -115,7 +115,7 @@
                     <div class="doc-nm">{{ d.name }} <span class="doc-title" v-if="d.title">{{ d.title }}</span></div>
                     <div class="doc-sub">{{ d.hospital_name || '' }} · {{ d.specialty || d.department || '' }}</div>
                   </div>
-                  <button class="btn-go" @click="goBook">去预约</button>
+                  <button class="btn-go" @click="goBook(d)">去预约</button>
                 </div>
               </div>
             </div>
@@ -207,8 +207,11 @@ function goBack() {
   router.back()
 }
 
-function goBook() {
-  router.push('/medical-staff-query')
+function goBook(doctor) {
+  router.push({
+    path: '/medical-staff-query',
+    query: { doctorId: String(doctor.id) }
+  })
 }
 
 function avatarColor(name) {

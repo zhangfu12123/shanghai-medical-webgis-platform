@@ -19,6 +19,25 @@ function randomSalt() {
   return crypto.randomBytes(16).toString('hex')
 }
 
+function isPastDate(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return false
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  return date < today
+}
+
+function isPastTimeSlot(date, slot) {
+  if (!date || date !== getTodayString()) return false
+  const endMinutes = String(slot || '').includes('上午') ? 11 * 60 + 30 : 16 * 60 + 30
+  const now = new Date()
+  return now.getHours() * 60 + now.getMinutes() >= endMinutes
+}
+
+function getTodayString() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
 // 把数据库层错误转成对用户友好的提示（尤其是指引先执行升级脚本建表）
 function friendlyDbError(prefix, err) {
   const m = String((err && err.message) || err || '')
@@ -163,6 +182,12 @@ router.post('/appoint', async (req, res) => {
     if (!doctor_id || !patient_name || !patient_phone) {
       return res.json({ code: 500, msg: '参数不全：医生、姓名、手机号必填' })
     }
+    if (isPastDate(appoint_date)) {
+      return res.json({ code: 400, msg: '预约日期只能选择今天或今后的时间' })
+    }
+    if (isPastTimeSlot(appoint_date, time_slot)) {
+      return res.json({ code: 400, msg: '所选时间段已结束，请选择其他时间段' })
+    }
     const pool = getPool()
 
     // 额度校验：同医生 + 同日期 + 同时段，已约满则拒绝
@@ -278,6 +303,12 @@ router.post('/appointment/edit', async (req, res) => {
     }
     if (chkRs.recordset[0].patient_phone !== login_phone) {
       return res.json({ code: 403, msg: '无权操作：只能编辑本人预约' })
+    }
+    if (isPastDate(appoint_date)) {
+      return res.json({ code: 400, msg: '预约日期只能选择今天或今后的时间' })
+    }
+    if (isPastTimeSlot(appoint_date, time_slot)) {
+      return res.json({ code: 400, msg: '所选时间段已结束，请选择其他时间段' })
     }
 
     // 额度校验：排除当前这条记录自身

@@ -278,14 +278,17 @@
             </div>
             <div class="form-item">
               <label>预约日期 <i>*</i></label>
-              <input v-model="appointForm.appoint_date" type="date" />
+              <input v-model="appointForm.appoint_date" type="date" :min="today" />
             </div>
             <div class="form-item">
               <label>时间段 <i>*</i></label>
               <select v-model="appointForm.time_slot">
                 <option value="">请选择</option>
-                <option v-for="s in timeSlots" :key="s" :value="s">{{ s }}</option>
+                <option v-for="s in availableTimeSlots" :key="s" :value="s">{{ s }}</option>
               </select>
+              <span class="slot-hint busy" v-if="appointForm.appoint_date === today && availableTimeSlots.length === 0">
+                今天已没有可预约的时间段，请选择其他日期
+              </span>
               <span class="slot-hint" :class="slotStatus" v-if="slotStatus !== 'idle'">
                 <template v-if="slotStatus === 'checking'">⏳ 正在查询名额…</template>
                 <template v-else-if="slotStatus === 'busy'">⚠ 该时段已约满，请更换时间段</template>
@@ -468,13 +471,13 @@
           </div>
           <div class="form-item">
             <label>预约日期 <i>*</i></label>
-            <input v-model="editForm.appoint_date" type="date" />
+            <input v-model="editForm.appoint_date" type="date" :min="today" />
           </div>
           <div class="form-item">
             <label>时间段 <i>*</i></label>
             <select v-model="editForm.time_slot">
               <option value="">请选择</option>
-              <option v-for="s in timeSlots" :key="s" :value="s">{{ s }}</option>
+              <option v-for="s in editableTimeSlots" :key="s" :value="s">{{ s }}</option>
             </select>
           </div>
           <div class="form-item full">
@@ -568,11 +571,13 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import request from '../api/request'
 
 const router = useRouter()
+const route = useRoute()
 const view = ref('query')
+const today = getTodayString()
 
 // 下拉选项
 const hospitals = ref([])
@@ -616,7 +621,10 @@ const scheduleDeptChart = computed(() => {
 
 // 预约
 const timeSlots = ['上午 08:30-11:30', '下午 13:30-16:30', '全天 08:00-16:30']
+const availableTimeSlots = computed(() => timeSlots.filter(slot => !isPastTimeSlot(appointForm.appoint_date, slot)))
+const editableTimeSlots = computed(() => timeSlots.filter(slot => !isPastTimeSlot(editForm.appoint_date, slot)))
 const appointDoctor = ref(null)
+const pendingAppointmentDoctor = ref(null)
 const appointForm = reactive({
   doctor_id: '', doctor_name: '', hospital_id: '', hospital_name: '', department: '',
   patient_name: '', patient_gender: '', patient_age: '', patient_phone: '',
@@ -650,6 +658,24 @@ function showToast(text, type = 'success') {
   toast.type = type
   toast.show = true
   setTimeout(() => { toast.show = false }, 2200)
+}
+
+function getTodayString() {
+  const date = new Date()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+function isPastDate(date) {
+  return Boolean(date) && date < today
+}
+
+function isPastTimeSlot(date, slot) {
+  if (date !== today) return false
+  const endMinutes = slot.includes('上午') ? 11 * 60 + 30 : 16 * 60 + 30
+  const now = new Date()
+  return now.getHours() * 60 + now.getMinutes() >= endMinutes
 }
 
 // 自定义确认弹窗（替代 window.confirm）
@@ -754,6 +780,11 @@ watch(
   () => [appointForm.doctor_id, appointForm.appoint_date, appointForm.time_slot],
   ([did, d, slot]) => {
     clearTimeout(checkTimer)
+    if (slot && !availableTimeSlots.value.includes(slot)) {
+      appointForm.time_slot = ''
+      resetSlotCheck()
+      return
+    }
     if (!did || !d || !slot) {
       resetSlotCheck()
       return
@@ -838,6 +869,7 @@ function openDetail(d) {
 }
 
 function startAppoint(d) {
+  pendingAppointmentDoctor.value = d
   // 必须登录患者账号才能预约
   if (!account.value) {
     showToast('请先登录后再预约', 'error')
@@ -848,6 +880,7 @@ function startAppoint(d) {
     showToast('只有患者账号才能预约', 'error')
     return
   }
+  pendingAppointmentDoctor.value = null
   appointDoctor.value = d
   appointForm.doctor_id = d.id
   appointForm.doctor_name = d.name
@@ -874,6 +907,14 @@ async function submitAppoint() {
   }
   if (!appointForm.patient_name || !appointForm.patient_phone || !appointForm.appoint_date || !appointForm.time_slot) {
     showToast('请填写姓名、手机号、日期与时间段', 'error')
+    return
+  }
+  if (isPastDate(appointForm.appoint_date)) {
+    showToast('预约日期只能选择今天或今后的时间', 'error')
+    return
+  }
+  if (isPastTimeSlot(appointForm.appoint_date, appointForm.time_slot)) {
+    showToast('所选时间段已结束，请选择其他时间段', 'error')
     return
   }
   try {
@@ -944,6 +985,14 @@ function openEdit(a) {
 }
 
 async function saveEdit() {
+  if (!editForm.appoint_date || isPastDate(editForm.appoint_date)) {
+    showToast('预约日期只能选择今天或今后的时间', 'error')
+    return
+  }
+  if (!editForm.time_slot || isPastTimeSlot(editForm.appoint_date, editForm.time_slot)) {
+    showToast('所选时间段已结束，请选择其他时间段', 'error')
+    return
+  }
   try {
     const res = await request.post('/staff/appointment/edit', { ...editForm, login_phone: account.value?.phone || '' })
     if (res.code === 200) {
@@ -1083,6 +1132,12 @@ async function doLogin(phone, password) {
       if (res.data.role === 'doctor') {
         switchView('doctor')
       } else {
+        if (pendingAppointmentDoctor.value) {
+          const doctor = pendingAppointmentDoctor.value
+          pendingAppointmentDoctor.value = null
+          startAppoint(doctor)
+          return
+        }
         minePhone.value = res.data.phone
         mineQueried.value = false
         switchView('mine')
@@ -1204,14 +1259,19 @@ async function confirmAppointment(a) {
   })
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadOptions()
-  loadDoctors()
   try {
     const saved = localStorage.getItem(ACCOUNT_KEY)
     if (saved) account.value = JSON.parse(saved)
   } catch (e) {
     /* ignore */
+  }
+  await loadDoctors()
+  const doctorId = route.query.doctorId
+  if (doctorId) {
+    const doctor = doctorList.value.find(d => String(d.id) === String(doctorId))
+    if (doctor) startAppoint(doctor)
   }
 })
 </script>
