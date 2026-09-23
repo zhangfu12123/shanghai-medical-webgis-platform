@@ -217,16 +217,32 @@ const frontLevel = computed(() => {
 })
 
 // 四项指标（用于列表进度条）
-const metrics = computed(() => [
-  { key: 'hospital', label: '医院覆盖率', value: rawIndex.hospitalCoverage, color: '#00e5ff' },
-  { key: 'pharmacy', label: '药店覆盖率', value: rawIndex.pharmacyCoverage, color: '#ffb300' },
-  { key: 'community', label: '社区覆盖率', value: rawIndex.communityCoverage, color: '#4caf50' },
-  { key: 'spatial', label: '空间均衡度', value: rawIndex.spatialBalance, color: '#b388ff' }
-])
+const metrics = computed(() => {
+  const wSum = weightSum.value || 1
+  return [
+    { key: 'hospital', label: '医院覆盖率', value: Math.round(rawIndex.hospitalCoverage * (weights.hospital || 0) / wSum), color: '#00e5ff' },
+    { key: 'pharmacy', label: '药店覆盖率', value: Math.round(rawIndex.pharmacyCoverage * (weights.pharmacy || 0) / wSum), color: '#ffb300' },
+    { key: 'community', label: '社区覆盖率', value: Math.round(rawIndex.communityCoverage * (weights.community || 0) / wSum), color: '#4caf50' },
+    { key: 'spatial', label: '空间均衡度', value: Math.round(rawIndex.spatialBalance * (weights.spatial || 0) / wSum), color: '#b388ff' }
+  ]
+})
+
 
 const radarData = ref({ indicators: [], values: [], dimensions: [], weakest: '', weakestValue: 0, suggestion: '' })
 const aiData = ref({ shortages: [], mix: { items: [], diagnosis: '' }, findings: [], suggestions: [] })
 const errorMsg = ref('')
+const computedRadarValues = computed(() => {
+  const indicators = radarData.value.indicators || []
+  const originValues = radarData.value.values || []
+  if (!indicators.length) return []
+  // 假设雷达图的前四个维度依次对应：医院、药店、社区、空间
+  const weightArr = [weights.hospital, weights.pharmacy, weights.community, weights.spatial]
+  return originValues.map((v, i) => {
+    const w = weightArr[i] || 0
+    return Math.round(v * w)
+  })
+})
+
 
 // 风险矩阵：原始片区数据 + 可调模型参数 + 调度推演
 const riskRegions = ref([])
@@ -593,6 +609,10 @@ function resetRiskParams() {
 watch(frontResilience, () => {
   updateGauge()
 })
+watch(weights, () => {
+  updateRadar()
+}, { deep: true })
+
 
 // 风险矩阵参数或推演值变化时，实时重算散点
 watch(scatterPoints, () => {
