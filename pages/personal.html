@@ -1,0 +1,67 @@
+html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>个人中心 - 上海市公共医疗资源服务平台</title>
+  <link rel="stylesheet" href="../css/main.css" />
+  <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+</head>
+<body>
+<div id="app" class="notice-page" v-cloak>
+  <header class="top-header">
+    <div class="logo">🏥 上海市公共医疗资源服务平台</div>
+    <div class="header-right"><a href="../index.html">← 返回主页</a></div>
+  </header>
+
+  <div class="page-container">
+    <h2 class="page-title">👤 个人中心</h2>
+
+    <template v-if="username">
+      <div class="card">
+        <h3>账号信息</h3>
+        <div class="info-row"><span>用户名：</span><b>{{ username }}</b></div>
+        <div class="info-row"><span>最近登录：</span><b>{{ loginTime }}</b></div>
+        <div class="info-row"><span>角色：</span><b>前端 · GIS底座 &amp; UI（何飞 / D）</b></div>
+      </div>
+
+      <div class="card">
+        <h3>我的收藏</h3>
+        <p class="empty-tip">暂无收藏。收藏接口由 C 同学（张星富）collectApi.js 提供，接入后自动显示。</p>
+      </div>
+
+      <div class="card">
+        <h3>查询历史</h3>
+        <p class="empty-tip">暂无查询历史。</p>
+      </div>
+
+      <div class="card">
+        <button class="btn-primary" @click="logout">退出登录</button>
+      </div>
+    </template>
+
+    <div v-else class="card">
+      <p class="empty-tip">你还没有登录，<a href="login.html">去登录</a></p>
+    </div>
+  </div>
+</div>
+<script>
+new Vue({
+  el: '#app',
+  data: {
+    username: localStorage.getItem('tj_username') || '',
+    loginTime: localStorage.getItem('tj_login_time') || '—'
+  },
+  methods: {
+    logout: function () {
+      localStorage.removeItem('tj_username');
+      localStorage.removeItem('tj_login_time');
+      alert('已退出登录');
+      location.href = '../index.html';
+    }
+  }
+});
+</script>
+</body>
+</html>
